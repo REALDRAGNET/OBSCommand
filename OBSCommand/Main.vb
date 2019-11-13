@@ -202,10 +202,12 @@ Module Main
                                     fields.Add(tmpsplit(0), tmpsplit(1))
                                 End If
                             Next
-                            _obs.SendRequest(tmp(0), fields)
+                            Console.SetOut(myout)
+                            Console.WriteLine(_obs.SendRequest(tmp(0), fields))
 
                         Else
-                            _obs.SendRequest(command)
+                            Console.SetOut(myout)
+                            Console.WriteLine(_obs.SendRequest(command))
                         End If
 
                         'Dim myType As System.Type = GetType(OBSWebsocket)
@@ -417,7 +419,7 @@ Module Main
     Private Sub PrintUsage()
         Dim out As List(Of String) = New List(Of String)
 
-        out.Add("OBSCommand v1.4.7 ©2018-2019 by FSC-SOFT (http://www.VoiceMacro.net)")
+        out.Add("OBSCommand v1.4.8 ©2018-2019 by FSC-SOFT (http://www.VoiceMacro.net)")
         out.Add(vbCrLf)
         out.Add("Usage:")
         out.Add("------")
