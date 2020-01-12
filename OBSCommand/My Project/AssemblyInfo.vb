@@ -12,7 +12,7 @@ Imports System.Runtime.InteropServices
 <Assembly: AssemblyDescription("Control OBS via Websocket plugin")>
 <Assembly: AssemblyCompany("FSC-SOFT")>
 <Assembly: AssemblyProduct("OBSCommand")>
-<Assembly: AssemblyCopyright("Copyright © FSC-SOFT 2018-2019")>
+<Assembly: AssemblyCopyright("Copyright © FSC-SOFT 2018-2020")>
 <Assembly: AssemblyTrademark("")>
 
 <Assembly: ComVisible(False)>
@@ -31,5 +31,5 @@ Imports System.Runtime.InteropServices
 ' übernehmen, indem Sie "*" eingeben:
 ' <Assembly: AssemblyVersion("1.0.*")> 
 
-<Assembly: AssemblyVersion("1.4.8.0")>
-<Assembly: AssemblyFileVersion("1.4.8.0")>
+<Assembly: AssemblyVersion("1.4.9.0")>
+<Assembly: AssemblyFileVersion("1.4.9.0")>

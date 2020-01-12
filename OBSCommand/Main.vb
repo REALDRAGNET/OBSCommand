@@ -190,17 +190,25 @@ Module Main
                                     Console.SetOut(myout)
                                     Console.WriteLine("Error with command """ & command & """: " & "Missing a = in Name=Type")
                                 End If
-                                If IsNumeric(tmpsplit(1)) Then
-                                    If tmpsplit(1).Contains(".") Then
-                                        fields.Add(tmpsplit(0), Double.Parse(tmpsplit(1), System.Globalization.CultureInfo.InvariantCulture))
-                                    Else
-                                        fields.Add(tmpsplit(0), CInt(tmpsplit(1)))
-                                    End If
-                                ElseIf tmpsplit(1).ToUpper = "TRUE" Or tmpsplit(1).ToUpper = "FALSE" Then
-                                    fields.Add(tmpsplit(0), CBool(tmpsplit(1)))
+                                'If IsNumeric(tmpsplit(1)) Then
+                                '    If tmpsplit(1).Contains(".") Then
+                                '        fields.Add(tmpsplit(0), Double.Parse(tmpsplit(1), System.Globalization.CultureInfo.InvariantCulture))
+                                '    Else
+                                '        fields.Add(tmpsplit(0), CInt(tmpsplit(1)))
+                                '    End If
+                                'ElseIf tmpsplit(1).ToUpper = "TRUE" Or tmpsplit(1).ToUpper = "FALSE" Then
+                                '    fields.Add(tmpsplit(0), CBool(tmpsplit(1)))
+                                'Else
+                                If tmpsplit.Count > 2 Then
+                                    Dim subfield As New JObject
+                                    subfield.Add(ConvertToType(tmpsplit(1)), ConvertToType(tmpsplit(2)))
+                                    fields.Add(ConvertToType(tmpsplit(0)), subfield)
                                 Else
-                                    fields.Add(tmpsplit(0), tmpsplit(1))
+                                    fields.Add(ConvertToType(tmpsplit(0)), ConvertToType(tmpsplit(1)))
                                 End If
+
+                                'End If
+
                             Next
                             Console.SetOut(myout)
                             Console.WriteLine(_obs.SendRequest(tmp(0), fields))
@@ -357,9 +365,19 @@ Module Main
 
     End Sub
 
-    Private Sub EventReceived()
-
-    End Sub
+    Private Function ConvertToType(ByVal text As String) As JToken
+        If IsNumeric(text) Then
+            If text.Contains(".") Then
+                Return Double.Parse(text, System.Globalization.CultureInfo.InvariantCulture)
+            Else
+                Return CInt(text)
+            End If
+        ElseIf text.ToUpper = "TRUE" Or text.ToUpper = "FALSE" Then
+            Return CBool(text)
+        Else
+            Return text
+        End If
+    End Function
 
     Private Sub OBSToggleSource(ByVal source As String, Optional ByVal sceneName As String = "")
 
@@ -419,7 +437,7 @@ Module Main
     Private Sub PrintUsage()
         Dim out As List(Of String) = New List(Of String)
 
-        out.Add("OBSCommand v1.4.8 ©2018-2019 by FSC-SOFT (http://www.VoiceMacro.net)")
+        out.Add("OBSCommand v1.4.9 ©2018-2020 by FSC-SOFT (http://www.VoiceMacro.net)")
         out.Add(vbCrLf)
         out.Add("Usage:")
         out.Add("------")
