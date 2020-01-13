@@ -497,7 +497,7 @@ Module Main
         out.Add(vbCrLf)
         out.Add("Usage:")
         out.Add("------")
-        out.Add("OBSCommand.exe /server=127.0.0.1:4444 /password=xxxx /delay=0.5 /setdelay=0.05 /profile=myprofile /scene=myscene /hidesource=myscene/mysource /showsource=myscene/mysource /togglesource=myscene/mysource /toggleaudio=myaudio /mute=myaudio /unmute=myaudio /setvolume=mysource,volume,delay /startstream /stopstream /startrecording /stoprecording /command=mycommand,myparam1=myvalue1...")
+        out.Add("OBSCommand.exe /server=127.0.0.1:4444 /password=xxxx /delay=0.5 /setdelay=0.05 /profile=myprofile /scene=myscene /hidesource=myscene/mysource /showsource=myscene/mysource /togglesource=myscene/mysource /toggleaudio=myaudio /mute=myaudio /unmute=myaudio /setvolume=mysource,volume,delay /fadeopacity=mysource,myfiltername,startopacity,endopacity,[fadedelay],[fadestep] /startstream /stopstream /startrecording /stoprecording /command=mycommand,myparam1=myvalue1...")
         out.Add(vbCrLf)
         out.Add("Note: If Server is omitted, default 127.0.0.1:4444 will be used.")
         out.Add("Use quotes if your item name includes spaces.")
