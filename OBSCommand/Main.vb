@@ -23,6 +23,7 @@ Module Main
         Dim toggleaudio As String = ""
         Dim mute As String = ""
         Dim unmute As String = ""
+        Dim fadeopacity As String = ""
         Dim setvolume As String = ""
         Dim stopstream As Boolean = False
         Dim startstream As Boolean = False
@@ -31,6 +32,8 @@ Module Main
         Dim command As String = ""
         Dim delay As String = ""
         Dim setdelay As Double
+
+        Dim errormessage As String = ""
 
         If args.Count = 1 Then
             PrintUsage()
@@ -64,6 +67,7 @@ Module Main
             mute = ""
             unmute = ""
             setvolume = ""
+            fadeopacity = ""
             stopstream = False
             startstream = False
             startrecording = False
@@ -137,6 +141,9 @@ Module Main
             End If
             If arg.StartsWith("/setvolume=") Then
                 setvolume = arg.Replace("/setvolume=", "")
+            End If
+            If arg.StartsWith("/fadeopacity=") Then
+                fadeopacity = arg.Replace("/fadeopacity=", "")
             End If
             If arg = "/startstream" Then
                 startstream = True
@@ -310,8 +317,28 @@ Module Main
                     fields.Add("mute", False)
                     _obs.SendRequest("SetMute", fields)
                 End If
+
+                If fadeopacity <> "" Then
+                    ' source,filtername,startopacity,endopacity,[fadedelay],[fadestep]
+                    Dim tmp As String() = fadeopacity.Split(",")
+                    If tmp.Count < 4 Then
+                        Throw New Exception("/fadeopacity is missing required parameters!")
+                    End If
+                    If Not IsNumeric(tmp(2)) Or Not IsNumeric(tmp(3)) Then Throw New Exception("Opacity value is not nummeric (0-100)!")
+                    If tmp.Count = 4 Then
+                        Opacityfade(tmp(0), tmp(1), tmp(2), tmp(3))
+                    ElseIf tmp.Count = 5 Then
+                        If Not IsNumeric(tmp(4)) Then Throw New Exception("Delay value is not nummeric (0-x)!")
+                        Opacityfade(tmp(0), tmp(1), tmp(2), tmp(3), tmp(4))
+                    ElseIf tmp.Count = 6 Then
+                        If Not IsNumeric(tmp(4)) Then Throw New Exception("Delay value is not nummeric (0-x)!")
+                        If Not IsNumeric(tmp(5)) Then Throw New Exception("Fadestep value is not nummeric (1-x)!")
+                        Opacityfade(tmp(0), tmp(1), tmp(2), tmp(3), tmp(4), tmp(5))
+                    End If
+                End If
+
                 If setvolume <> "" Then
-                    ' source/volume,delay
+                    ' source/volume,[delay]
                     Dim tmp As String() = setvolume.Split(",")
                     If Not IsNumeric(tmp(1)) Then Throw New Exception("Volume value is not nummeric (0-100)!")
                     If tmp.Count = 2 Then
@@ -344,24 +371,22 @@ Module Main
                 End If
 
             Catch ex As Exception
-                Try
-                    _obs.Disconnect()
-                Catch ex2 As Exception
-
-                End Try
-                Console.SetOut(myout)
-                Console.WriteLine("Error: " & ex.Message.ToString())
-                End
+                errormessage = ex.Message.ToString()
             End Try
         Next
         Try
             _obs.Disconnect()
-            Console.SetOut(myout)
-            Console.WriteLine("Ok")
+
         Catch ex As Exception
 
         End Try
 
+        Console.SetOut(myout)
+        If errormessage = "" Then
+            Console.WriteLine("Ok")
+        Else
+            Console.WriteLine("Error: " & errormessage)
+        End If
 
     End Sub
 
@@ -394,13 +419,44 @@ Module Main
 
     End Sub
 
+    Private Sub Opacityfade(ByVal source As String, ByVal filtername As String, ByVal fadestart As Integer, ByVal fadeend As Integer, Optional ByVal delay As Integer = 0, Optional ByVal fadestep As Integer = 1)
+
+        If delay < 5 Then delay = 5
+        If delay > 1000 Then delay = 1000
+        Dim fields As New JObject
+
+        If fadestart < fadeend Then
+            For a As Integer = fadestart To fadeend Step fadestep
+                fields = New JObject
+                fields.Add("sourceName", source)
+                fields.Add("filterName", filtername)
+                Dim tmpfield As JObject = New JObject
+                tmpfield.Add("opacity", ConvertToType(a))
+                fields.Add("filterSettings", tmpfield)
+                _obs.SendRequest("SetSourceFilterSettings", fields)
+                Threading.Thread.Sleep(delay)
+            Next
+        ElseIf fadestart > fadeend Then
+            For a As Integer = fadestart To fadeend Step -fadestep
+                fields = New JObject
+                fields.Add("sourceName", source)
+                fields.Add("filterName", filtername)
+                Dim tmpfield As JObject = New JObject
+                tmpfield.Add("opacity", ConvertToType(a))
+                fields.Add("filterSettings", tmpfield)
+                _obs.SendRequest("SetSourceFilterSettings", fields)
+                Threading.Thread.Sleep(delay)
+            Next
+        End If
+    End Sub
+
     Private Sub OBSSetVolume(ByVal source As String, ByVal volume As Integer, Optional ByVal delay As Integer = 0)
         If delay = 0 Then
             '_obs.SetVolume(source, volume / 100)
             _obs.SendRequest("SetVolume", New JObject(source, volume / 100))
 
         Else
-            If delay > 10 Then delay = 10
+            If delay < 5 Then delay = 5
             If delay > 1000 Then delay = 1000
             'Dim _VolumeInfo As VolumeInfo = _obs.GetVolume(source)
             Dim fields As New JObject
@@ -437,7 +493,7 @@ Module Main
     Private Sub PrintUsage()
         Dim out As List(Of String) = New List(Of String)
 
-        out.Add("OBSCommand v1.4.9 ©2018-2020 by FSC-SOFT (http://www.VoiceMacro.net)")
+        out.Add("OBSCommand v1.5.0 ©2018-2020 by FSC-SOFT (http://www.VoiceMacro.net)")
         out.Add(vbCrLf)
         out.Add("Usage:")
         out.Add("------")
@@ -465,6 +521,7 @@ Module Main
         out.Add("OBSCommand.exe /unmute=""my Audio Source""")
         out.Add("OBSCommand.exe /setvolume=Mic/Aux,0,50")
         out.Add("OBSCommand.exe /setvolume=Mic/Aux,100")
+        out.Add("OBSCommand.exe /fadeopacity=Mysource,myfiltername,0,100,5,2")
         out.Add("OBSCommand.exe /stopstream")
         out.Add("OBSCommand.exe /profile=myprofile /scene=myscene /showsource=mysource")
         out.Add("OBSCommand.exe /showsource=mysource")
@@ -473,6 +530,7 @@ Module Main
         out.Add("OBSCommand.exe /showsource=""my scene""/""my source""")
         out.Add("OBSCommand.exe /command=SaveReplayBuffer")
         out.Add("OBSCommand.exe /command=TakeSourceScreenshot,sourceName=MyScene,PictureFormat=png,saveToFilePath=C:\OBSTest.png")
+        out.Add("OBSCommand.exe /command=SetSourceFilterSettings,sourceName=""Color Correction"",filterName=Opacity,filterSettings=opacity=10")
         out.Add("OBSCommand.exe /scene=mysource1 /delay=1.555 /scene=mysource2")
         out.Add("OBSCommand.exe /setdelay=1.555 /scene=mysource1 /scene=mysource2")
         out.Add(vbCrLf)
@@ -497,6 +555,9 @@ Module Main
         out.Add("                                  volume is 0-100, delay is in milliseconds")
         out.Add("                                  between steps (min. 10, max. 1000) for fading")
         out.Add("  Note:  if delay is omitted volume is set instant")
+        out.Add("/fadeopacity=mysource,myfiltername,startopacity,endopacity,[fadedelay],[fadestep]")
+        out.Add("                                  start/end opacity is 0-100, 0=fully transparent")
+        out.Add("                                  delay is in milliseconds, step 0-100")
         out.Add("/startstream                      starts streaming")
         out.Add("/stopstream                       stop streaming")
         out.Add("/startrecording                   starts recording")
@@ -505,6 +566,8 @@ Module Main
         out.Add("General User Command syntax:")
         out.Add("/command=mycommand,myparam1=myvalue1,myparam2=myvalue2...")
         out.Add("                                  issues user command,parameter(s) (optional)")
+        out.Add("/command=mycommand,myparam1=myvalue1,myparam2=myvalue2,myparam3=mysubparam=mysubparamvalue")
+        out.Add("                                  issues user command,parameters and sub-parameters")
         out.Add("")
         out.Add("A full list of commands is available here https://github.com/Palakis/obs-websocket/blob/4.x-current/docs/generated/protocol.md")
         out.Add("")
