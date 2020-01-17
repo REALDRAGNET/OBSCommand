@@ -572,6 +572,7 @@ Module Main
         out.Add("/fadeopacity=mysource,myfiltername,startopacity,endopacity,[fadedelay],[fadestep]")
         out.Add("                                  start/end opacity is 0-100, 0=fully transparent")
         out.Add("                                  delay is in milliseconds, step 0-100")
+        out.Add("             Note: Use -1 for start- or endopacity for fade from/to current value")
         out.Add("/startstream                      starts streaming")
         out.Add("/stopstream                       stop streaming")
         out.Add("/startrecording                   starts recording")
