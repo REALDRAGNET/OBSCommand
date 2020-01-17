@@ -425,6 +425,20 @@ Module Main
         If delay > 1000 Then delay = 1000
         Dim fields As New JObject
 
+        If fadestart = -1 Or fadeend = -1 Then
+            Dim tmpfield As JObject = New JObject
+            tmpfield.Add("sourceName", source)
+            tmpfield.Add("filterName", filtername)
+            Dim result As JObject = _obs.SendRequest("GetSourceFilterInfo", tmpfield)
+            If fadestart = -1 Then
+                Dim tmp As JObject = result.GetValue("settings")
+                fadestart = CInt(tmp.GetValue("opacity"))
+            ElseIf fadeend = -1 Then
+                Dim tmp As JObject = result.GetValue("settings")
+                fadeend = CInt(tmp.GetValue("opacity"))
+            End If
+        End If
+
         If fadestart < fadeend Then
             For a As Integer = fadestart To fadeend Step fadestep
                 fields = New JObject
@@ -493,7 +507,7 @@ Module Main
     Private Sub PrintUsage()
         Dim out As List(Of String) = New List(Of String)
 
-        out.Add("OBSCommand v1.5.0 ©2018-2020 by FSC-SOFT (http://www.VoiceMacro.net)")
+        out.Add("OBSCommand v1.5.1 ©2018-2020 by FSC-SOFT (http://www.VoiceMacro.net)")
         out.Add(vbCrLf)
         out.Add("Usage:")
         out.Add("------")
