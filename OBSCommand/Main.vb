@@ -2,10 +2,12 @@
 Imports System.Text
 Imports OBSWebsocketDotNet
 Imports Newtonsoft.Json.Linq
+Imports System.ComponentModel
 
 Module Main
 
     Private _obs As OBSWebsocket
+    Dim myout As TextWriter = Console.Out
 
     Sub Main()
 
@@ -24,11 +26,14 @@ Module Main
         Dim mute As String = ""
         Dim unmute As String = ""
         Dim fadeopacity As String = ""
+        Dim slidesetting As String = ""
+        Dim slideasync As String = ""
         Dim setvolume As String = ""
         Dim stopstream As Boolean = False
         Dim startstream As Boolean = False
         Dim startrecording As Boolean = False
         Dim stoprecording As Boolean = False
+        Dim sendjson As String = False
         Dim command As String = ""
         Dim delay As String = ""
         Dim setdelay As Double
@@ -40,7 +45,6 @@ Module Main
             End
         End If
 
-        Dim myout As TextWriter = Console.Out
         Dim builder As StringBuilder = New StringBuilder()
         Dim writer As TextWriter = New StringWriter(builder)
         Console.SetOut(writer)
@@ -60,6 +64,7 @@ Module Main
             profile = ""
             scene = ""
             command = ""
+            sendjson = ""
             hidesource = ""
             showsource = ""
             togglesource = ""
@@ -68,6 +73,8 @@ Module Main
             unmute = ""
             setvolume = ""
             fadeopacity = ""
+            slidesetting = ""
+            slideasync = ""
             stopstream = False
             startstream = False
             startrecording = False
@@ -121,6 +128,9 @@ Module Main
             If arg.StartsWith("/command=") Then
                 command = arg.Replace("/command=", "")
             End If
+            If arg.StartsWith("/sendjson=") Then
+                sendjson = arg.Replace("/sendjson=", "")
+            End If
             If arg.StartsWith("/hidesource=") Then
                 hidesource = arg.Replace("/hidesource=", "")
             End If
@@ -144,6 +154,12 @@ Module Main
             End If
             If arg.StartsWith("/fadeopacity=") Then
                 fadeopacity = arg.Replace("/fadeopacity=", "")
+            End If
+            If arg.StartsWith("/slidesetting=") Then
+                slidesetting = arg.Replace("/slidesetting=", "")
+            End If
+            If arg.StartsWith("/slideasync=") Then
+                slideasync = arg.Replace("/slideasync=", "")
             End If
             If arg = "/startstream" Then
                 startstream = True
@@ -172,12 +188,35 @@ Module Main
                     fields.Add("profile-name", profile)
                     _obs.SendRequest("SetCurrentProfile", fields)
                 End If
+
                 If scene <> "" Then
                     '_obs.SetCurrentScene(scene)
                     Dim fields As New JObject
                     fields.Add("scene-name", scene)
                     Dim response As JObject = _obs.SendRequest("SetCurrentScene", fields)
                 End If
+
+                ' sendjson
+                If sendjson <> "" Then
+                    Dim json As New JObject
+                    'sendjson = """ReorderSceneItems={'scene': 'Game', 'items': [{'name': 'Image'}, {'name': 'Spielaufnahme'}]}"""
+                    If Not sendjson.Contains("=") Then
+                        errormessage = "sendjson missing ""="" after command"
+                        Exit For
+                    End If
+                    Dim tmp As String() = {"", ""}
+                    Try
+                        tmp(0) = sendjson.Substring(0, sendjson.IndexOf("="))
+                        tmp(1) = sendjson.Substring(sendjson.IndexOf("=") + 1)
+                        tmp(1) = tmp(1).Replace("'", Chr(34))
+                        json = JObject.Parse(tmp(1))
+                        Console.WriteLine(_obs.SendRequest(tmp(0), json))
+                    Catch ex As Exception
+                        errormessage = "sendjson error:" & vbCrLf & ex.Message.ToString()
+                    End Try
+
+                End If
+
                 If command <> "" Then
                     Dim myParameter As Object = Nothing
 
@@ -186,10 +225,6 @@ Module Main
                         If command.Contains(",") Then
                             Dim tmp As String() = command.Split(",")
 
-                            'If tmp.Count = 2 Then
-                            '    command = tmp(0)
-                            '    myParameter = tmp(1)
-                            'End If
                             Dim fields As New JObject
                             For a = 1 To tmp.Count - 1
                                 Dim tmpsplit As String() = tmp(a).Split("=")
@@ -197,15 +232,7 @@ Module Main
                                     Console.SetOut(myout)
                                     Console.WriteLine("Error with command """ & command & """: " & "Missing a = in Name=Type")
                                 End If
-                                'If IsNumeric(tmpsplit(1)) Then
-                                '    If tmpsplit(1).Contains(".") Then
-                                '        fields.Add(tmpsplit(0), Double.Parse(tmpsplit(1), System.Globalization.CultureInfo.InvariantCulture))
-                                '    Else
-                                '        fields.Add(tmpsplit(0), CInt(tmpsplit(1)))
-                                '    End If
-                                'ElseIf tmpsplit(1).ToUpper = "TRUE" Or tmpsplit(1).ToUpper = "FALSE" Then
-                                '    fields.Add(tmpsplit(0), CBool(tmpsplit(1)))
-                                'Else
+
                                 If tmpsplit.Count > 2 Then
                                     Dim subfield As New JObject
                                     subfield.Add(ConvertToType(tmpsplit(1)), ConvertToType(tmpsplit(2)))
@@ -213,10 +240,8 @@ Module Main
                                 Else
                                     fields.Add(ConvertToType(tmpsplit(0)), ConvertToType(tmpsplit(1)))
                                 End If
-
-                                'End If
-
                             Next
+
                             Console.SetOut(myout)
                             Console.WriteLine(_obs.SendRequest(tmp(0), fields))
 
@@ -225,19 +250,7 @@ Module Main
                             Console.WriteLine(_obs.SendRequest(command))
                         End If
 
-                        'Dim myType As System.Type = GetType(OBSWebsocket)
-                        'Dim myInfo As System.Reflection.MethodInfo = myType.GetMethod(command)
-                        'If myInfo = Nothing Then
-                        '    Console.SetOut(myout)
-                        '    Console.WriteLine("Error! Command """ & command & """ not found.")
-                        'Else
-                        '    Try
-                        '        Dim returnvalue As String = myInfo.Invoke(_obs, myParameter)
 
-                        '        If returnvalue <> "" Then
-                        '            Console.SetOut(myout)
-                        '            Console.WriteLine(returnvalue)
-                        '        End If
                     Catch ex As Exception
                         Console.SetOut(myout)
                         Console.WriteLine("Error with command """ & command & """: " & ex.Message.ToString())
@@ -324,16 +337,63 @@ Module Main
                     If tmp.Count < 4 Then
                         Throw New Exception("/fadeopacity is missing required parameters!")
                     End If
-                    If Not IsNumeric(tmp(2)) Or Not IsNumeric(tmp(3)) Then Throw New Exception("Opacity value is not nummeric (0-100)!")
+                    If Not IsNumeric(tmp(2)) Or Not IsNumeric(tmp(3)) Then Throw New Exception("Opacity start or end value is not nummeric (0-100)!")
                     If tmp.Count = 4 Then
-                        Opacityfade(tmp(0), tmp(1), tmp(2), tmp(3))
+                        Call DoSlideSetting(tmp(0), tmp(1), "opacity", tmp(2), tmp(3))
                     ElseIf tmp.Count = 5 Then
                         If Not IsNumeric(tmp(4)) Then Throw New Exception("Delay value is not nummeric (0-x)!")
-                        Opacityfade(tmp(0), tmp(1), tmp(2), tmp(3), tmp(4))
+                        Call DoSlideSetting(tmp(0), tmp(1), "opacity", tmp(2), tmp(3), tmp(4))
                     ElseIf tmp.Count = 6 Then
                         If Not IsNumeric(tmp(4)) Then Throw New Exception("Delay value is not nummeric (0-x)!")
                         If Not IsNumeric(tmp(5)) Then Throw New Exception("Fadestep value is not nummeric (1-x)!")
-                        Opacityfade(tmp(0), tmp(1), tmp(2), tmp(3), tmp(4), tmp(5))
+                        Call DoSlideSetting(tmp(0), tmp(1), "opacity", tmp(2), tmp(3), tmp(4), tmp(5))
+                    End If
+                End If
+
+                If slidesetting <> "" Then
+                    ' source,filtername,settingname,startvalue,endvalue,[slidedelay],[slidestep]
+                    Dim tmp As String() = slidesetting.Split(",")
+                    If tmp.Count < 5 Then
+                        Throw New Exception("/slideSetting is missing required parameters!")
+                    End If
+                    If Not IsNumericOrAsterix(tmp(3)) Or Not IsNumericOrAsterix(tmp(4)) Then Throw New Exception("Slide start or end value is not nummeric (0-100)!")
+                    If tmp.Count = 5 Then
+                        DoSlideSetting(tmp(0), tmp(1), tmp(2), tmp(3), tmp(4))
+                    ElseIf tmp.Count = 6 Then
+                        If Not IsNumeric(tmp(5)) Then Throw New Exception("Delay value is not nummeric (0-x)!")
+                        DoSlideSetting(tmp(0), tmp(1), tmp(2), tmp(3), tmp(4), tmp(5))
+                    ElseIf tmp.Count = 7 Then
+                        If Not IsNumeric(tmp(5)) Then Throw New Exception("Delay value is not nummeric (0-x)!")
+                        If Not IsNumeric(tmp(6)) Then Throw New Exception("Slide step value is not nummeric (1-x)!")
+                        DoSlideSetting(tmp(0), tmp(1), tmp(2), tmp(3), tmp(4), tmp(5), tmp(6))
+                    End If
+                End If
+
+                If slideasync <> "" Then
+                    ' source,filtername,settingname,startvalue,endvalue,[slidedelay],[slidestep]
+                    Dim tmp As String() = slideasync.Split(",")
+                    If tmp.Count < 5 Then
+                        Throw New Exception("/slideSetting is missing required parameters!")
+                    End If
+                    If Not IsNumericOrAsterix(tmp(3)) Or Not IsNumericOrAsterix(tmp(4)) Then Throw New Exception("Slide start or end value is not nummeric (0-100)!")
+                    If tmp.Count = 5 Then
+                        Dim ExecuteTask As New AsyncSlideSettings(server, password, tmp(0), tmp(1), tmp(2), tmp(3), tmp(4))
+                        Dim t As Threading.Thread
+                        t = New Threading.Thread(AddressOf ExecuteTask.StartSlide)
+                        t.Start()
+                    ElseIf tmp.Count = 6 Then
+                        If Not IsNumeric(tmp(5)) Then Throw New Exception("Delay value is not nummeric (0-x)!")
+                        Dim ExecuteTask As New AsyncSlideSettings(server, password, tmp(0), tmp(1), tmp(2), tmp(3), tmp(4), tmp(5))
+                        Dim t As Threading.Thread
+                        t = New Threading.Thread(AddressOf ExecuteTask.StartSlide)
+                        t.Start()
+                    ElseIf tmp.Count = 7 Then
+                        If Not IsNumeric(tmp(5)) Then Throw New Exception("Delay value is not nummeric (0-x)!")
+                        If Not IsNumeric(tmp(6)) Then Throw New Exception("Slide step value is not nummeric (1-x)!")
+                        Dim ExecuteTask As New AsyncSlideSettings(server, password, tmp(0), tmp(1), tmp(2), tmp(3), tmp(4), tmp(5), tmp(6))
+                        Dim t As Threading.Thread
+                        t = New Threading.Thread(AddressOf ExecuteTask.StartSlide)
+                        t.Start()
                     End If
                 End If
 
@@ -390,6 +450,14 @@ Module Main
 
     End Sub
 
+    Private Function IsNumericOrAsterix(ByVal value As String) As Boolean
+        If value = "*" Then Return True
+
+        If Not IsNumeric(value) Then Return False
+
+        Return True
+    End Function
+
     Private Function ConvertToType(ByVal text As String) As JToken
         If IsNumeric(text) Then
             If text.Contains(".") Then
@@ -419,24 +487,79 @@ Module Main
 
     End Sub
 
-    Private Sub Opacityfade(ByVal source As String, ByVal filtername As String, ByVal fadestart As Integer, ByVal fadeend As Integer, Optional ByVal delay As Integer = 0, Optional ByVal fadestep As Integer = 1)
+    'Private Sub Opacityfade(ByVal source As String, ByVal filtername As String, ByVal fadestart As Integer, ByVal fadeend As Integer, Optional ByVal delay As Integer = 0, Optional ByVal fadestep As Integer = 1)
+
+    '    If delay < 5 Then delay = 5
+    '    If delay > 1000 Then delay = 1000
+    '    Dim fields As New JObject
+
+    '    If fadestart = -1 Or fadeend = -1 Then
+    '        Dim tmpfield As JObject = New JObject
+    '        tmpfield.Add("sourceName", source)
+    '        tmpfield.Add("filterName", filtername)
+    '        Dim result As JObject = _obs.SendRequest("GetSourceFilterInfo", tmpfield)
+    '        If fadestart = -1 Then
+    '            Dim tmp As JObject = result.GetValue("settings")
+    '            fadestart = CInt(tmp.GetValue("opacity"))
+    '        ElseIf fadeend = -1 Then
+    '            Dim tmp As JObject = result.GetValue("settings")
+    '            fadeend = CInt(tmp.GetValue("opacity"))
+    '        End If
+    '    End If
+
+    '    If fadestart < fadeend Then
+    '        For a As Integer = fadestart To fadeend Step fadestep
+    '            fields = New JObject
+    '            fields.Add("sourceName", source)
+    '            fields.Add("filterName", filtername)
+    '            Dim tmpfield As JObject = New JObject
+    '            tmpfield.Add("opacity", ConvertToType(a))
+    '            fields.Add("filterSettings", tmpfield)
+    '            _obs.SendRequest("SetSourceFilterSettings", fields)
+    '            Threading.Thread.Sleep(delay)
+    '        Next
+    '    ElseIf fadestart > fadeend Then
+    '        For a As Integer = fadestart To fadeend Step -fadestep
+    '            fields = New JObject
+    '            fields.Add("sourceName", source)
+    '            fields.Add("filterName", filtername)
+    '            Dim tmpfield As JObject = New JObject
+    '            tmpfield.Add("opacity", ConvertToType(a))
+    '            fields.Add("filterSettings", tmpfield)
+    '            _obs.SendRequest("SetSourceFilterSettings", fields)
+    '            Threading.Thread.Sleep(delay)
+    '        Next
+    '    End If
+    'End Sub
+
+    Private Sub DoSlideSetting(ByVal source As String, ByVal filtername As String, ByVal settingname As String, ByVal fadestart As String, ByVal fadeend As String, Optional ByVal delay As Integer = 0, Optional ByVal fadestep As String = "1")
 
         If delay < 5 Then delay = 5
         If delay > 1000 Then delay = 1000
         Dim fields As New JObject
 
-        If fadestart = -1 Or fadeend = -1 Then
+        If fadestart = "*" Or fadeend = "*" Then
             Dim tmpfield As JObject = New JObject
             tmpfield.Add("sourceName", source)
             tmpfield.Add("filterName", filtername)
             Dim result As JObject = _obs.SendRequest("GetSourceFilterInfo", tmpfield)
-            If fadestart = -1 Then
+            If fadestart = "*" Then
                 Dim tmp As JObject = result.GetValue("settings")
-                fadestart = CInt(tmp.GetValue("opacity"))
-            ElseIf fadeend = -1 Then
+                fadestart = tmp.GetValue(settingname)
+            ElseIf fadeend = "*" Then
                 Dim tmp As JObject = result.GetValue("settings")
-                fadeend = CInt(tmp.GetValue("opacity"))
+                fadeend = tmp.GetValue(settingname)
             End If
+        End If
+
+        Dim haddecimals As Boolean = False
+
+        If fadestep < 1 Then
+            haddecimals = True
+            fadestart = fadestart * 100
+            fadeend = fadeend * 100
+            fadestep = fadestep * 100
+            delay = delay / 100
         End If
 
         If fadestart < fadeend Then
@@ -445,7 +568,11 @@ Module Main
                 fields.Add("sourceName", source)
                 fields.Add("filterName", filtername)
                 Dim tmpfield As JObject = New JObject
-                tmpfield.Add("opacity", ConvertToType(a))
+                If haddecimals = True Then
+                    tmpfield.Add(settingname, ConvertToType(a / 100))
+                Else
+                    tmpfield.Add(settingname, ConvertToType(a))
+                End If
                 fields.Add("filterSettings", tmpfield)
                 _obs.SendRequest("SetSourceFilterSettings", fields)
                 Threading.Thread.Sleep(delay)
@@ -456,7 +583,11 @@ Module Main
                 fields.Add("sourceName", source)
                 fields.Add("filterName", filtername)
                 Dim tmpfield As JObject = New JObject
-                tmpfield.Add("opacity", ConvertToType(a))
+                If haddecimals = True Then
+                    tmpfield.Add(settingname, ConvertToType(a / 100))
+                Else
+                    tmpfield.Add(settingname, ConvertToType(a))
+                End If
                 fields.Add("filterSettings", tmpfield)
                 _obs.SendRequest("SetSourceFilterSettings", fields)
                 Threading.Thread.Sleep(delay)
@@ -507,11 +638,11 @@ Module Main
     Private Sub PrintUsage()
         Dim out As List(Of String) = New List(Of String)
 
-        out.Add("OBSCommand v1.5.1 ©2018-2020 by FSC-SOFT (http://www.VoiceMacro.net)")
+        out.Add("OBSCommand v1.5.2 ©2018-2020 by FSC-SOFT (http://www.VoiceMacro.net)")
         out.Add(vbCrLf)
         out.Add("Usage:")
         out.Add("------")
-        out.Add("OBSCommand.exe /server=127.0.0.1:4444 /password=xxxx /delay=0.5 /setdelay=0.05 /profile=myprofile /scene=myscene /hidesource=myscene/mysource /showsource=myscene/mysource /togglesource=myscene/mysource /toggleaudio=myaudio /mute=myaudio /unmute=myaudio /setvolume=mysource,volume,delay /fadeopacity=mysource,myfiltername,startopacity,endopacity,[fadedelay],[fadestep] /startstream /stopstream /startrecording /stoprecording /command=mycommand,myparam1=myvalue1...")
+        out.Add("OBSCommand.exe /server=127.0.0.1:4444 /password=xxxx /delay=0.5 /setdelay=0.05 /profile=myprofile /scene=myscene /hidesource=myscene/mysource /showsource=myscene/mysource /togglesource=myscene/mysource /toggleaudio=myaudio /mute=myaudio /unmute=myaudio /setvolume=mysource,volume,delay /fadeopacity=mysource,myfiltername,startopacity,endopacity,[fadedelay],[fadestep] /slidesetting=mysource,myfiltername,startvalue,endvalue,[slidedelay],[slidestep] /slideasync=mysource,myfiltername,startvalue,endvalue,[slidedelay],[slidestep] /startstream /stopstream /startrecording /stoprecording /command=mycommand,myparam1=myvalue1... /sendjson=jsonstring")
         out.Add(vbCrLf)
         out.Add("Note: If Server is omitted, default 127.0.0.1:4444 will be used.")
         out.Add("Use quotes if your item name includes spaces.")
@@ -536,6 +667,8 @@ Module Main
         out.Add("OBSCommand.exe /setvolume=Mic/Aux,0,50")
         out.Add("OBSCommand.exe /setvolume=Mic/Aux,100")
         out.Add("OBSCommand.exe /fadeopacity=Mysource,myfiltername,0,100,5,2")
+        out.Add("OBSCommand.exe /slidesetting=Mysource,myfiltername,contrast,-2,0,100,0.01")
+        out.Add("OBSCommand.exe /slideasync=Mysource,myfiltername,saturation,*,5,100,0.1")
         out.Add("OBSCommand.exe /stopstream")
         out.Add("OBSCommand.exe /profile=myprofile /scene=myscene /showsource=mysource")
         out.Add("OBSCommand.exe /showsource=mysource")
@@ -545,6 +678,7 @@ Module Main
         out.Add("OBSCommand.exe /command=SaveReplayBuffer")
         out.Add("OBSCommand.exe /command=TakeSourceScreenshot,sourceName=MyScene,PictureFormat=png,saveToFilePath=C:\OBSTest.png")
         out.Add("OBSCommand.exe /command=SetSourceFilterSettings,sourceName=""Color Correction"",filterName=Opacity,filterSettings=opacity=10")
+        out.Add("OBSCommand.exe /sendjson=""ReorderSceneItems={'scene': 'MyScene', 'items': [{'name': 'Image'}, {'name': 'Gamecapture'}]}""")
         out.Add("OBSCommand.exe /scene=mysource1 /delay=1.555 /scene=mysource2")
         out.Add("OBSCommand.exe /setdelay=1.555 /scene=mysource1 /scene=mysource2")
         out.Add(vbCrLf)
@@ -573,6 +707,13 @@ Module Main
         out.Add("                                  start/end opacity is 0-100, 0=fully transparent")
         out.Add("                                  delay is in milliseconds, step 0-100")
         out.Add("             Note: Use -1 for start- or endopacity for fade from/to current value")
+        out.Add("/slidesetting=mysource,myfiltername,settingname,startvalue,endvalue,[slidedelay],[slidestep]")
+        out.Add("                                  start/end value min/max depends on setting!")
+        out.Add("                                  delay is in milliseconds")
+        out.Add("                                  step depends on setting (can be x Or 0.x Or 0.0x)")
+        out.Add("             Note: Use * for start- or end value to slide from/to current value")
+        out.Add("/slideasync")
+        out.Add("            The same as slidesetting, only this one runs asynchron!")
         out.Add("/startstream                      starts streaming")
         out.Add("/stopstream                       stop streaming")
         out.Add("/startrecording                   starts recording")
@@ -620,4 +761,100 @@ Module Main
         Console.Write(New String(" "c, Console.WindowWidth))
         Console.SetCursorPosition(0, currentLineCursor)
     End Sub
+
+    Class AsyncSlideSettings
+        Dim _server As String
+        Dim _password As String
+        Dim _source As String
+        Dim _filtername As String
+        Dim _settingname As String
+        Dim _fadestart As String
+        Dim _fadeend As String
+        Dim _delay As Integer
+        Dim _fadestep As String
+
+        Public Sub New(ByVal server As String, ByVal password As String, ByVal source As String, ByVal filtername As String, ByVal settingname As String, ByVal fadestart As String, ByVal fadeend As String, Optional ByVal delay As Integer = 0, Optional ByVal fadestep As String = "1")
+            _server = server
+            _password = password
+            _source = source
+            _filtername = filtername
+            _settingname = settingname
+            _fadestart = fadestart
+            _fadeend = fadeend
+            _delay = delay
+            _fadestep = fadestep
+        End Sub
+
+        Public Sub StartSlide()
+            SlideSetting(_server, _password, _source, _filtername, _settingname, _fadestart, _fadeend, _delay, _fadestep)
+        End Sub
+
+        Public Sub SlideSetting(ByVal server As String, ByVal password As String, ByVal source As String, ByVal filtername As String, ByVal settingname As String, ByVal fadestart As String, ByVal fadeend As String, Optional ByVal delay As Integer = 0, Optional ByVal fadestep As String = "1")
+            Dim obs = New OBSWebsocket()
+            obs.WSTimeout = New TimeSpan(0, 0, 0, 3)
+            obs.Connect(server, password)
+
+            If delay < 5 Then delay = 5
+            If delay > 1000 Then delay = 1000
+            Dim fields As New JObject
+
+            If fadestart = "*" Or fadeend = "*" Then
+                Dim tmpfield As JObject = New JObject
+                tmpfield.Add("sourceName", source)
+                tmpfield.Add("filterName", filtername)
+                Dim result As JObject = obs.SendRequest("GetSourceFilterInfo", tmpfield)
+                If fadestart = "*" Then
+                    Dim tmp As JObject = result.GetValue("settings")
+                    fadestart = tmp.GetValue(settingname)
+                ElseIf fadeend = "*" Then
+                    Dim tmp As JObject = result.GetValue("settings")
+                    fadeend = tmp.GetValue(settingname)
+                End If
+            End If
+
+            Dim haddecimals As Boolean = False
+
+            If fadestep < 1 Then
+                haddecimals = True
+                fadestart = fadestart * 100
+                fadeend = fadeend * 100
+                fadestep = fadestep * 100
+                delay = delay / 100
+            End If
+
+            If fadestart < fadeend Then
+                For a As Integer = fadestart To fadeend Step fadestep
+                    fields = New JObject
+                    fields.Add("sourceName", source)
+                    fields.Add("filterName", filtername)
+                    Dim tmpfield As JObject = New JObject
+                    If haddecimals = True Then
+                        tmpfield.Add(settingname, ConvertToType(a / 100))
+                    Else
+                        tmpfield.Add(settingname, ConvertToType(a))
+                    End If
+                    fields.Add("filterSettings", tmpfield)
+                    obs.SendRequest("SetSourceFilterSettings", fields)
+                    Threading.Thread.Sleep(delay)
+                Next
+            ElseIf fadestart > fadeend Then
+                For a As Integer = fadestart To fadeend Step -fadestep
+                    fields = New JObject
+                    fields.Add("sourceName", source)
+                    fields.Add("filterName", filtername)
+                    Dim tmpfield As JObject = New JObject
+                    If haddecimals = True Then
+                        tmpfield.Add(settingname, ConvertToType(a / 100))
+                    Else
+                        tmpfield.Add(settingname, ConvertToType(a))
+                    End If
+                    fields.Add("filterSettings", tmpfield)
+                    obs.SendRequest("SetSourceFilterSettings", fields)
+                    Threading.Thread.Sleep(delay)
+                Next
+            End If
+
+            _obs.Disconnect()
+        End Sub
+    End Class
 End Module
