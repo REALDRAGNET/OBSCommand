@@ -337,7 +337,7 @@ Module Main
                     If tmp.Count < 4 Then
                         Throw New Exception("/fadeopacity is missing required parameters!")
                     End If
-                    If Not IsNumeric(tmp(2)) Or Not IsNumeric(tmp(3)) Then Throw New Exception("Opacity start or end value is not nummeric (0-100)!")
+                    If Not IsNumericOrAsterix(tmp(2)) Or Not IsNumericOrAsterix(tmp(3)) Then Throw New Exception("Opacity start or end value is not nummeric (0-100)!")
                     If tmp.Count = 4 Then
                         Call DoSlideSetting(tmp(0), tmp(1), "opacity", tmp(2), tmp(3))
                     ElseIf tmp.Count = 5 Then
@@ -638,7 +638,7 @@ Module Main
     Private Sub PrintUsage()
         Dim out As List(Of String) = New List(Of String)
 
-        out.Add("OBSCommand v1.5.2 ©2018-2020 by FSC-SOFT (http://www.VoiceMacro.net)")
+        out.Add("OBSCommand v1.5.3 ©2018-2020 by FSC-SOFT (http://www.VoiceMacro.net)")
         out.Add(vbCrLf)
         out.Add("Usage:")
         out.Add("------")
@@ -706,7 +706,7 @@ Module Main
         out.Add("/fadeopacity=mysource,myfiltername,startopacity,endopacity,[fadedelay],[fadestep]")
         out.Add("                                  start/end opacity is 0-100, 0=fully transparent")
         out.Add("                                  delay is in milliseconds, step 0-100")
-        out.Add("             Note: Use -1 for start- or endopacity for fade from/to current value")
+        out.Add("             Note: Use * for start- or endopacity for fade from/to current value")
         out.Add("/slidesetting=mysource,myfiltername,settingname,startvalue,endvalue,[slidedelay],[slidestep]")
         out.Add("                                  start/end value min/max depends on setting!")
         out.Add("                                  delay is in milliseconds")
