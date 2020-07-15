@@ -188,12 +188,15 @@ namespace OBSWebsocketDotNet
             // Send the message and wait for a response
             // (received and notified by the websocket response handler)
             WSConnection.Send(body.ToString());
-            tcs.Task.Wait();
+            tcs.Task.Wait(WSTimeout);
 
             if (tcs.Task.IsCanceled) {
                 throw new ErrorResponseException("Request canceled");
             }
-
+            if  (!tcs.Task.IsCompleted)
+            {
+                throw new ErrorResponseException("Request timed out");
+            }
             // Throw an exception if the server returned an error.
             // An error occurs if authentication fails or one if the request body is invalid.
             var result = tcs.Task.Result;
