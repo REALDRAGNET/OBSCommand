@@ -463,6 +463,9 @@ Module Main
             If text.Contains(".") Then
                 Return Double.Parse(text, System.Globalization.CultureInfo.InvariantCulture)
             Else
+                If CLng(text) > Integer.MaxValue Or CLng(text) < Integer.MinValue Then
+                    Return CLng(text)
+                End If
                 Return CInt(text)
             End If
         ElseIf text.ToUpper = "TRUE" Or text.ToUpper = "FALSE" Then
