@@ -386,7 +386,7 @@ Module Main
                 End If
 
                 If setvolume <> "" Then
-                    ' source,volume,[delay]
+                    ' source,volume,[delay],[steps]
                     Dim tmp As String() = setvolume.Split(",")
                     If Not IsNumeric(tmp(1)) Then Throw New Exception("Volume value is not nummeric (0-100)!")
                     If tmp.Count = 2 Then
@@ -394,6 +394,10 @@ Module Main
                     ElseIf tmp.Count = 3 Then
                         If Not IsNumeric(tmp(2)) Then Throw New Exception("Delay value is not nummeric (5-1000)!")
                         OBSSetVolume(tmp(0), tmp(1), tmp(2))
+                    ElseIf tmp.Count = 4 Then
+                        If Not IsNumeric(tmp(2)) Then Throw New Exception("Delay value is not nummeric (5-1000)!")
+                        If Not IsNumeric(tmp(3)) Then Throw New Exception("Step value is not nummeric (1-99)!")
+                        OBSSetVolume(tmp(0), tmp(1), tmp(2), tmp(3))
                     End If
                 End If
                 If startstream = True Then
@@ -537,7 +541,9 @@ Module Main
         End If
     End Sub
 
-    Private Sub OBSSetVolume(ByVal source As String, ByVal volume As Integer, Optional ByVal delay As Integer = 0)
+    Private Sub OBSSetVolume(ByVal source As String, ByVal volume As Integer, Optional ByVal delay As Integer = 0, Optional ByVal steps As Integer = 1)
+        If steps < 1 Then steps = 1
+        If steps > 99 Then steps = 99
         If delay = 0 Then
             Dim molvol As Double = volume ^ 3 / 1000000 ' Convert percent to amplitude/mul (approximate, mul is non-linear)
             Dim fields As New JObject
@@ -556,7 +562,7 @@ Module Main
             If startvolume = volume Then
                 Exit Sub
             ElseIf startvolume < volume Then
-                For a = startvolume To volume
+                For a = startvolume To volume Step steps
                     fields = New JObject
                     fields.Add("source", source)
                     fields.Add("volume", CDbl(a ^ 3 / 1000000))
@@ -564,7 +570,7 @@ Module Main
                     Threading.Thread.Sleep(delay)
                 Next
             ElseIf startvolume > volume Then
-                For a = startvolume To volume Step -1
+                For a = startvolume To volume Step -steps
                     fields = New JObject
                     fields.Add("source", source)
                     fields.Add("volume", CDbl(a ^ 3 / 1000000))
@@ -578,11 +584,11 @@ Module Main
     Private Sub PrintUsage()
         Dim out As List(Of String) = New List(Of String)
 
-        out.Add("OBSCommand v1.5.5 ©2018-2021 by FSC-SOFT (http://www.VoiceMacro.net)")
+        out.Add("OBSCommand v1.5.6 ©2018-2021 by FSC-SOFT (http://www.VoiceMacro.net)")
         out.Add(vbCrLf)
         out.Add("Usage:")
         out.Add("------")
-        out.Add("OBSCommand.exe /server=127.0.0.1:4444 /password=xxxx /delay=0.5 /setdelay=0.05 /profile=myprofile /scene=myscene /hidesource=myscene/mysource /showsource=myscene/mysource /togglesource=myscene/mysource /toggleaudio=myaudio /mute=myaudio /unmute=myaudio /setvolume=mysource,volume,delay /fadeopacity=mysource,myfiltername,startopacity,endopacity,[fadedelay],[fadestep] /slidesetting=mysource,myfiltername,startvalue,endvalue,[slidedelay],[slidestep] /slideasync=mysource,myfiltername,startvalue,endvalue,[slidedelay],[slidestep] /startstream /stopstream /startrecording /stoprecording /command=mycommand,myparam1=myvalue1... /sendjson=jsonstring")
+        out.Add("OBSCommand.exe /server=127.0.0.1:4444 /password=xxxx /delay=0.5 /setdelay=0.05 /profile=myprofile /scene=myscene /hidesource=myscene/mysource /showsource=myscene/mysource /togglesource=myscene/mysource /toggleaudio=myaudio /mute=myaudio /unmute=myaudio /setvolume=mysource,volume,[delay],[steps] /fadeopacity=mysource,myfiltername,startopacity,endopacity,[fadedelay],[fadestep] /slidesetting=mysource,myfiltername,startvalue,endvalue,[slidedelay],[slidestep] /slideasync=mysource,myfiltername,startvalue,endvalue,[slidedelay],[slidestep] /startstream /stopstream /startrecording /stoprecording /command=mycommand,myparam1=myvalue1... /sendjson=jsonstring")
         out.Add(vbCrLf)
         out.Add("Note: If Server is omitted, default 127.0.0.1:4444 will be used.")
         out.Add("Use quotes if your item name includes spaces.")
@@ -604,7 +610,7 @@ Module Main
         out.Add("OBSCommand.exe /toggleaudio=""Desktop Audio""")
         out.Add("OBSCommand.exe /mute=myAudioSource")
         out.Add("OBSCommand.exe /unmute=""my Audio Source""")
-        out.Add("OBSCommand.exe /setvolume=Mic/Aux,0,50")
+        out.Add("OBSCommand.exe /setvolume=Mic/Aux,0,50,2")
         out.Add("OBSCommand.exe /setvolume=Mic/Aux,100")
         out.Add("OBSCommand.exe /fadeopacity=Mysource,myfiltername,0,100,5,2")
         out.Add("OBSCommand.exe /slidesetting=Mysource,myfiltername,contrast,-2,0,100,0.01")
@@ -639,9 +645,10 @@ Module Main
         out.Add("/toggleaudio=myaudio              toggle mute from audio source ""myaudio""")
         out.Add("/mute=myaudio                     mute audio source ""myaudio""")
         out.Add("/unmute=myaudio                   unmute audio source ""myaudio""")
-        out.Add("/setvolume=myaudio,volume,delay   set volume of audio source ""myaudio""")
-        out.Add("                                  volume is 0-100, delay is in milliseconds")
+        out.Add("/setvolume=myaudio,volume,delay,  set volume of audio source ""myaudio""")
+        out.Add("steps                             volume is 0-100, delay is in milliseconds")
         out.Add("                                  between steps (min. 5, max. 1000) for fading")
+        out.Add("                                  steps is (1-99), default step is 1")
         out.Add("  Note:  if delay is omitted volume is set instant")
         out.Add("/fadeopacity=mysource,myfiltername,startopacity,endopacity,[fadedelay],[fadestep]")
         out.Add("                                  start/end opacity is 0-100, 0=fully transparent")
