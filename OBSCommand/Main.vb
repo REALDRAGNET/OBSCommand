@@ -11,8 +11,6 @@ Module Main
 
     Sub Main()
 
-        'AddHandler _obs.EventReceived, AddressOf EventReceived
-
         Dim args As String() = Environment.GetCommandLineArgs
         Dim password As String = ""
         Dim server As String = "ws://127.0.0.1:4444"
@@ -183,14 +181,12 @@ Module Main
                 End If
 
                 If profile <> "" Then
-                    '_obs.SetCurrentProfile(profile)
                     Dim fields As New JObject()
                     fields.Add("profile-name", profile)
                     _obs.SendRequest("SetCurrentProfile", fields)
                 End If
 
                 If scene <> "" Then
-                    '_obs.SetCurrentScene(scene)
                     Dim fields As New JObject
                     fields.Add("scene-name", scene)
                     Dim response As JObject = _obs.SendRequest("SetCurrentScene", fields)
@@ -255,7 +251,6 @@ Module Main
                         Console.SetOut(myout)
                         Console.WriteLine("Error with command """ & command & """: " & ex.Message.ToString())
                     End Try
-                    'End If
                 End If
                 If hidesource <> "" Then
                     If hidesource.Contains("/") Then
@@ -263,7 +258,6 @@ Module Main
 
                         ' scene/source
                         If tmp.Count = 2 Then
-                            '_obs.SetSourceRender(tmp(1), False, tmp(0))
                             Dim fields As New JObject
                             fields.Add("source", tmp(1))
                             fields.Add("render", False)
@@ -271,7 +265,6 @@ Module Main
                             _obs.SendRequest("SetSourceRender", fields)
                         End If
                     Else
-                        '_obs.SetSourceRender(hidesource, False)
                         Dim fields As New JObject
                         fields.Add("source", hidesource)
                         fields.Add("render", False)
@@ -284,7 +277,6 @@ Module Main
 
                         ' scene/source
                         If tmp.Count = 2 Then
-                            '_obs.SetSourceRender(tmp(1), True, tmp(0))
                             Dim fields As New JObject
                             fields.Add("source", tmp(1))
                             fields.Add("render", True)
@@ -292,7 +284,6 @@ Module Main
                             _obs.SendRequest("SetSourceRender", fields)
                         End If
                     Else
-                        '_obs.SetSourceRender(showsource, True)
                         Dim fields As New JObject
                         fields.Add("source", showsource)
                         fields.Add("render", True)
@@ -311,20 +302,17 @@ Module Main
                     End If
                 End If
                 If toggleaudio <> "" Then
-                    '_obs.ToggleMute(toggleaudio)
                     Dim fields As New JObject
                     fields.Add("source", toggleaudio)
                     _obs.SendRequest("ToggleMute", fields)
                 End If
                 If mute <> "" Then
-                    '_obs.SetMute(mute, True)
                     Dim fields As New JObject
                     fields.Add("source", mute)
                     fields.Add("mute", True)
                     _obs.SendRequest("SetMute", fields)
                 End If
                 If unmute <> "" Then
-                    '_obs.SetMute(unmute, False)
                     Dim fields As New JObject
                     fields.Add("source", unmute)
                     fields.Add("mute", False)
@@ -398,31 +386,27 @@ Module Main
                 End If
 
                 If setvolume <> "" Then
-                    ' source/volume,[delay]
+                    ' source,volume,[delay]
                     Dim tmp As String() = setvolume.Split(",")
                     If Not IsNumeric(tmp(1)) Then Throw New Exception("Volume value is not nummeric (0-100)!")
                     If tmp.Count = 2 Then
                         OBSSetVolume(tmp(0), tmp(1))
                     ElseIf tmp.Count = 3 Then
-                        If Not IsNumeric(tmp(2)) Then Throw New Exception("Delay value is not nummeric (0-x)!")
+                        If Not IsNumeric(tmp(2)) Then Throw New Exception("Delay value is not nummeric (5-1000)!")
                         OBSSetVolume(tmp(0), tmp(1), tmp(2))
                     End If
                 End If
                 If startstream = True Then
-                    '_obs.StartStreaming()
                     _obs.SendRequest("StartStreaming")
 
                 End If
                 If stopstream = True Then
-                    '_obs.StopStreaming()
                     _obs.SendRequest("StopStreaming")
                 End If
                 If startrecording = True Then
-                    '_obs.StartRecording()
                     _obs.SendRequest("StartRecording")
                 End If
                 If stoprecording = True Then
-                    '_obs.StopRecording()
                     _obs.SendRequest("StopRecording")
                 End If
 
@@ -490,51 +474,6 @@ Module Main
 
     End Sub
 
-    'Private Sub Opacityfade(ByVal source As String, ByVal filtername As String, ByVal fadestart As Integer, ByVal fadeend As Integer, Optional ByVal delay As Integer = 0, Optional ByVal fadestep As Integer = 1)
-
-    '    If delay < 5 Then delay = 5
-    '    If delay > 1000 Then delay = 1000
-    '    Dim fields As New JObject
-
-    '    If fadestart = -1 Or fadeend = -1 Then
-    '        Dim tmpfield As JObject = New JObject
-    '        tmpfield.Add("sourceName", source)
-    '        tmpfield.Add("filterName", filtername)
-    '        Dim result As JObject = _obs.SendRequest("GetSourceFilterInfo", tmpfield)
-    '        If fadestart = -1 Then
-    '            Dim tmp As JObject = result.GetValue("settings")
-    '            fadestart = CInt(tmp.GetValue("opacity"))
-    '        ElseIf fadeend = -1 Then
-    '            Dim tmp As JObject = result.GetValue("settings")
-    '            fadeend = CInt(tmp.GetValue("opacity"))
-    '        End If
-    '    End If
-
-    '    If fadestart < fadeend Then
-    '        For a As Integer = fadestart To fadeend Step fadestep
-    '            fields = New JObject
-    '            fields.Add("sourceName", source)
-    '            fields.Add("filterName", filtername)
-    '            Dim tmpfield As JObject = New JObject
-    '            tmpfield.Add("opacity", ConvertToType(a))
-    '            fields.Add("filterSettings", tmpfield)
-    '            _obs.SendRequest("SetSourceFilterSettings", fields)
-    '            Threading.Thread.Sleep(delay)
-    '        Next
-    '    ElseIf fadestart > fadeend Then
-    '        For a As Integer = fadestart To fadeend Step -fadestep
-    '            fields = New JObject
-    '            fields.Add("sourceName", source)
-    '            fields.Add("filterName", filtername)
-    '            Dim tmpfield As JObject = New JObject
-    '            tmpfield.Add("opacity", ConvertToType(a))
-    '            fields.Add("filterSettings", tmpfield)
-    '            _obs.SendRequest("SetSourceFilterSettings", fields)
-    '            Threading.Thread.Sleep(delay)
-    '        Next
-    '    End If
-    'End Sub
-
     Private Sub DoSlideSetting(ByVal source As String, ByVal filtername As String, ByVal settingname As String, ByVal fadestart As String, ByVal fadeend As String, Optional ByVal delay As Integer = 0, Optional ByVal fadestep As String = "1")
 
         If delay < 5 Then delay = 5
@@ -600,37 +539,35 @@ Module Main
 
     Private Sub OBSSetVolume(ByVal source As String, ByVal volume As Integer, Optional ByVal delay As Integer = 0)
         If delay = 0 Then
-            '_obs.SetVolume(source, volume / 100)
-            _obs.SendRequest("SetVolume", New JObject(source, volume / 100))
-
+            Dim molvol As Double = volume ^ 3 / 1000000 ' Convert percent to amplitude/mul (approximate, mul is non-linear)
+            Dim fields As New JObject
+            fields.Add("source", source)
+            fields.Add("volume", molvol)
+            _obs.SendRequest("SetVolume", fields)
         Else
             If delay < 5 Then delay = 5
             If delay > 1000 Then delay = 1000
-            'Dim _VolumeInfo As VolumeInfo = _obs.GetVolume(source)
             Dim fields As New JObject
             fields.Add("source", source)
-
             Dim _VolumeInfo As JObject = _obs.SendRequest("GetVolume", fields)
 
-            Dim startvolume As Integer = CInt(_VolumeInfo.GetValue("volume")) * 100
+            Dim startvolume As Integer = Math.Pow(CDbl(_VolumeInfo.GetValue("volume")), 1.0 / 3) * 100 ' Convert amplitude/mul to percent (approximate, mul is non-linear)
 
             If startvolume = volume Then
                 Exit Sub
             ElseIf startvolume < volume Then
                 For a = startvolume To volume
-                    '_obs.SetVolume(source, (a / 100))
                     fields = New JObject
                     fields.Add("source", source)
-                    fields.Add("volume", a / 100)
+                    fields.Add("volume", CDbl(a ^ 3 / 1000000))
                     _obs.SendRequest("SetVolume", fields)
                     Threading.Thread.Sleep(delay)
                 Next
             ElseIf startvolume > volume Then
                 For a = startvolume To volume Step -1
-                    '_obs.SetVolume(source, (a / 100))
                     fields = New JObject
                     fields.Add("source", source)
-                    fields.Add("volume", a / 100)
+                    fields.Add("volume", CDbl(a ^ 3 / 1000000))
                     _obs.SendRequest("SetVolume", fields)
                     Threading.Thread.Sleep(delay)
                 Next
@@ -641,7 +578,7 @@ Module Main
     Private Sub PrintUsage()
         Dim out As List(Of String) = New List(Of String)
 
-        out.Add("OBSCommand v1.5.3 ©2018-2020 by FSC-SOFT (http://www.VoiceMacro.net)")
+        out.Add("OBSCommand v1.5.5 ©2018-2021 by FSC-SOFT (http://www.VoiceMacro.net)")
         out.Add(vbCrLf)
         out.Add("Usage:")
         out.Add("------")
@@ -704,7 +641,7 @@ Module Main
         out.Add("/unmute=myaudio                   unmute audio source ""myaudio""")
         out.Add("/setvolume=myaudio,volume,delay   set volume of audio source ""myaudio""")
         out.Add("                                  volume is 0-100, delay is in milliseconds")
-        out.Add("                                  between steps (min. 10, max. 1000) for fading")
+        out.Add("                                  between steps (min. 5, max. 1000) for fading")
         out.Add("  Note:  if delay is omitted volume is set instant")
         out.Add("/fadeopacity=mysource,myfiltername,startopacity,endopacity,[fadedelay],[fadestep]")
         out.Add("                                  start/end opacity is 0-100, 0=fully transparent")
@@ -735,9 +672,8 @@ Module Main
         Dim z As Integer = 0
 
         Do While True
-
             Console.WriteLine(out(i))
-            If z = Console.WindowHeight - 6 Then
+            If z > Console.WindowHeight - 1 Then
                 Console.Write("Press any key to continue...")
                 Console.ReadKey()
                 ClearCurrentConsoleLine()
@@ -747,12 +683,7 @@ Module Main
             z += 1
             If i >= out.Count Then Exit Do
 
-            If out(i).Length > Console.WindowWidth Then
-                z += 1
-            End If
-            If out(i).Length > Console.WindowWidth * 2 Then
-                z += 1
-            End If
+            z = z + out(i).Length / (Console.WindowWidth / 2)
         Loop
 
     End Sub
