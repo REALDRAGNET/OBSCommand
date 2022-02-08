@@ -2,7 +2,7 @@
 Imports System.Text
 Imports OBSWebsocketDotNet
 Imports Newtonsoft.Json.Linq
-Imports System.ComponentModel
+Imports System.Text.RegularExpressions
 
 Module Main
 
@@ -33,7 +33,6 @@ Module Main
         Dim stoprecording As Boolean = False
         Dim sendjson As String = False
         Dim command As String = ""
-        Dim delay As String = ""
         Dim setdelay As Double
 
         Dim errormessage As String = ""
@@ -77,7 +76,6 @@ Module Main
             startstream = False
             startrecording = False
             stoprecording = False
-            delay = ""
 
             If arg = "?" Or arg = "/?" Or arg = "-?" Or arg = "help" Or arg = "/help" Or arg = "-help" Then
                 PrintUsage()
@@ -95,6 +93,7 @@ Module Main
 
             If arg.StartsWith("/setdelay=") Then
                 Dim tmp As String = arg.Replace("/setdelay=", "")
+                tmp = tmp.Replace(",", ".")
                 If Not IsNumeric(tmp) Then
                     Console.SetOut(myout)
                     Console.WriteLine("Error: setdelay is not numeric")
@@ -107,6 +106,7 @@ Module Main
 
             If arg.StartsWith("/delay=") Then
                 Dim tmp As String = arg.Replace("/delay=", "")
+                tmp = tmp.Replace(",", ".")
                 If Not IsNumeric(tmp) Then
                     Console.SetOut(myout)
                     Console.WriteLine("Error: delay is not numeric")
@@ -223,7 +223,7 @@ Module Main
 
                             Dim fields As New JObject
                             For a = 1 To tmp.Count - 1
-                                Dim tmpsplit As String() = tmp(a).Split("=")
+                                Dim tmpsplit As String() = SplitWhilePreservingQuotedValues(tmp(a), "=")
                                 If tmpsplit.Count < 2 Then
                                     Console.SetOut(myout)
                                     Console.WriteLine("Error with command """ & command & """: " & "Missing a = in Name=Type")
@@ -584,7 +584,7 @@ Module Main
     Private Sub PrintUsage()
         Dim out As List(Of String) = New List(Of String)
 
-        out.Add("OBSCommand v1.5.6 ©2018-2021 by FSC-SOFT (http://www.VoiceMacro.net)")
+        out.Add("OBSCommand v1.5.7 ©2018-2022 by FSC-SOFT (http://www.VoiceMacro.net)")
         out.Add(vbCrLf)
         out.Add("Usage:")
         out.Add("------")
@@ -695,6 +695,22 @@ Module Main
 
     End Sub
 
+    Private Function SplitWhilePreservingQuotedValues(value As String, delimiter As Char, Optional ByVal DeleteQuotes As Boolean = False) As String()
+        Dim csvPreservingQuotedStrings As New Regex(String.Format("(""[^""]*""|[^{0}])+", delimiter))
+        Dim values = csvPreservingQuotedStrings.Matches(value).Cast(Of Match)().[Select](Function(m) m.Value.TrimStart(" ")).Where(Function(v) Not String.IsNullOrEmpty(v))
+
+        Dim tmp() As String = values.ToArray()
+
+        If DeleteQuotes = False Then Return tmp
+
+        For a = 0 To tmp.Length - 1
+            If tmp(a) <> Chr(34) AndAlso tmp(a).StartsWith(Chr(34)) And tmp(a).EndsWith(Chr(34)) Then
+                tmp(a) = tmp(a).Substring(1, tmp(a).Length - 2)
+            End If
+        Next
+
+        Return tmp
+    End Function
 
     Public Sub ClearCurrentConsoleLine()
         Dim currentLineCursor As Integer = Console.CursorTop
