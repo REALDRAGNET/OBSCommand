@@ -214,6 +214,8 @@ Module Main
                 End If
 
                 If command <> "" Then
+                    command = command.Replace("'", """")
+
                     Dim myParameter As Object = Nothing
 
                     Try
@@ -223,7 +225,7 @@ Module Main
 
                             Dim fields As New JObject
                             For a = 1 To tmp.Count - 1
-                                Dim tmpsplit As String() = SplitWhilePreservingQuotedValues(tmp(a), "=")
+                                Dim tmpsplit As String() = SplitWhilePreservingQuotedValues(tmp(a), "=", True)
                                 If tmpsplit.Count < 2 Then
                                     Console.SetOut(myout)
                                     Console.WriteLine("Error with command """ & command & """: " & "Missing a = in Name=Type")
