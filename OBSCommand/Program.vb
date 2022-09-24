@@ -1,19 +1,14 @@
-ï»¿Imports System.IO
-Imports System.Text
 Imports OBSWebsocketDotNet
 Imports Newtonsoft.Json.Linq
 Imports System.Text.RegularExpressions
-
 Module Main
 
     Private _obs As OBSWebsocket
-    Dim myout As TextWriter = Console.Out
-
     Sub Main()
 
         Dim args As String() = Environment.GetCommandLineArgs
         Dim password As String = ""
-        Dim server As String = "ws://127.0.0.1:4444"
+        Dim server As String = "ws://127.0.0.1:4455"
 
         Dim profile As String = ""
         Dim scene As String = ""
@@ -41,10 +36,6 @@ Module Main
             PrintUsage()
             End
         End If
-
-        Dim builder As StringBuilder = New StringBuilder()
-        Dim writer As TextWriter = New StringWriter(builder)
-        Console.SetOut(writer)
 
         Dim isInitialized As Boolean = False
         Dim skipfirst As Boolean = False
@@ -95,7 +86,6 @@ Module Main
                 Dim tmp As String = arg.Replace("/setdelay=", "")
                 tmp = tmp.Replace(",", ".")
                 If Not IsNumeric(tmp) Then
-                    Console.SetOut(myout)
                     Console.WriteLine("Error: setdelay is not numeric")
                     Continue For
                 Else
@@ -108,7 +98,6 @@ Module Main
                 Dim tmp As String = arg.Replace("/delay=", "")
                 tmp = tmp.Replace(",", ".")
                 If Not IsNumeric(tmp) Then
-                    Console.SetOut(myout)
                     Console.WriteLine("Error: delay is not numeric")
                     Continue For
                 Else
@@ -177,25 +166,34 @@ Module Main
                     isInitialized = True
                     _obs = New OBSWebsocket()
                     _obs.WSTimeout = New TimeSpan(0, 0, 0, 3)
-                    _obs.Connect(server, password)
+                    _obs.ConnectAsync(server, password)
+                    Dim i As Integer = 0
+                    Do While Not _obs.IsConnected
+                        Threading.Thread.Sleep(10)
+                        i += 1
+                        If i > 300 Then
+                            Console.Write("Error: can't connect to OBS websocket plugin!")
+                            End
+                        End If
+                    Loop
+                    'Dim versionInfo As ObsVersion = _obs.GetVersion()
                 End If
 
                 If profile <> "" Then
                     Dim fields As New JObject()
-                    fields.Add("profile-name", profile)
+                    fields.Add("profileName", profile)
                     _obs.SendRequest("SetCurrentProfile", fields)
                 End If
 
                 If scene <> "" Then
                     Dim fields As New JObject
-                    fields.Add("scene-name", scene)
-                    Dim response As JObject = _obs.SendRequest("SetCurrentScene", fields)
+                    fields.Add("sceneName", scene)
+                    Dim response As JObject = _obs.SendRequest("SetCurrentProgramScene", fields)
                 End If
 
                 ' sendjson
                 If sendjson <> "" Then
                     Dim json As New JObject
-                    'sendjson = """ReorderSceneItems={'scene': 'Game', 'items': [{'name': 'Image'}, {'name': 'Spielaufnahme'}]}"""
                     If Not sendjson.Contains("=") Then
                         errormessage = "sendjson missing ""="" after command"
                         Exit For
@@ -227,7 +225,6 @@ Module Main
                             For a = 1 To tmp.Count - 1
                                 Dim tmpsplit As String() = SplitWhilePreservingQuotedValues(tmp(a), "=", True)
                                 If tmpsplit.Count < 2 Then
-                                    Console.SetOut(myout)
                                     Console.WriteLine("Error with command """ & command & """: " & "Missing a = in Name=Type")
                                 End If
 
@@ -240,17 +237,13 @@ Module Main
                                 End If
                             Next
 
-                            Console.SetOut(myout)
                             Console.WriteLine(_obs.SendRequest(tmp(0), fields))
-
                         Else
-                            Console.SetOut(myout)
                             Console.WriteLine(_obs.SendRequest(command))
                         End If
 
 
                     Catch ex As Exception
-                        Console.SetOut(myout)
                         Console.WriteLine("Error with command """ & command & """: " & ex.Message.ToString())
                     End Try
                 End If
@@ -261,16 +254,18 @@ Module Main
                         ' scene/source
                         If tmp.Count = 2 Then
                             Dim fields As New JObject
-                            fields.Add("source", tmp(1))
-                            fields.Add("render", False)
-                            fields.Add("scene-name", tmp(0))
-                            _obs.SendRequest("SetSourceRender", fields)
+                            fields.Add("sceneName", tmp(0))
+                            fields.Add("sceneItemId", GetSceneItemId(tmp(0), tmp(1)))
+                            fields.Add("sceneItemEnabled", False)
+                            _obs.SendRequest("SetSceneItemEnabled", fields)
                         End If
                     Else
+                        Dim CurrentScene = GetCurrentProgramScene()
                         Dim fields As New JObject
-                        fields.Add("source", hidesource)
-                        fields.Add("render", False)
-                        _obs.SendRequest("SetSourceRender", fields)
+                        fields.Add("sceneName", CurrentScene)
+                        fields.Add("sceneItemId", GetSceneItemId(CurrentScene, hidesource))
+                        fields.Add("sceneItemEnabled", False)
+                        _obs.SendRequest("SetSceneItemEnabled", fields)
                     End If
                 End If
                 If showsource <> "" Then
@@ -280,16 +275,18 @@ Module Main
                         ' scene/source
                         If tmp.Count = 2 Then
                             Dim fields As New JObject
-                            fields.Add("source", tmp(1))
-                            fields.Add("render", True)
-                            fields.Add("scene-name", tmp(0))
-                            _obs.SendRequest("SetSourceRender", fields)
+                            fields.Add("sceneName", tmp(0))
+                            fields.Add("sceneItemId", GetSceneItemId(tmp(0), tmp(1)))
+                            fields.Add("sceneItemEnabled", True)
+                            _obs.SendRequest("SetSceneItemEnabled", fields)
                         End If
                     Else
+                        Dim CurrentScene = GetCurrentProgramScene()
                         Dim fields As New JObject
-                        fields.Add("source", showsource)
-                        fields.Add("render", True)
-                        _obs.SendRequest("SetSourceRender", fields)
+                        fields.Add("sceneName", CurrentScene)
+                        fields.Add("sceneItemId", GetSceneItemId(CurrentScene, hidesource))
+                        fields.Add("sceneItemEnabled", True)
+                        _obs.SendRequest("SetSceneItemEnabled", fields)
                     End If
 
                 End If
@@ -305,20 +302,20 @@ Module Main
                 End If
                 If toggleaudio <> "" Then
                     Dim fields As New JObject
-                    fields.Add("source", toggleaudio)
-                    _obs.SendRequest("ToggleMute", fields)
+                    fields.Add("inputName", toggleaudio)
+                    _obs.SendRequest("ToggleInputMute", fields)
                 End If
                 If mute <> "" Then
                     Dim fields As New JObject
-                    fields.Add("source", mute)
-                    fields.Add("mute", True)
-                    _obs.SendRequest("SetMute", fields)
+                    fields.Add("inputName", mute)
+                    fields.Add("inputMuted", True)
+                    _obs.SendRequest("SetInputMute", fields)
                 End If
                 If unmute <> "" Then
                     Dim fields As New JObject
-                    fields.Add("source", unmute)
-                    fields.Add("mute", False)
-                    _obs.SendRequest("SetMute", fields)
+                    fields.Add("inputName", unmute)
+                    fields.Add("inputMuted", False)
+                    _obs.SendRequest("SetInputMute", fields)
                 End If
 
                 If fadeopacity <> "" Then
@@ -370,12 +367,14 @@ Module Main
                         Dim ExecuteTask As New AsyncSlideSettings(server, password, tmp(0), tmp(1), tmp(2), tmp(3), tmp(4))
                         Dim t As Threading.Thread
                         t = New Threading.Thread(AddressOf ExecuteTask.StartSlide)
+                        t.IsBackground = True
                         t.Start()
                     ElseIf tmp.Count = 6 Then
                         If Not IsNumeric(tmp(5)) Then Throw New Exception("Delay value is not nummeric (0-x)!")
                         Dim ExecuteTask As New AsyncSlideSettings(server, password, tmp(0), tmp(1), tmp(2), tmp(3), tmp(4), tmp(5))
                         Dim t As Threading.Thread
                         t = New Threading.Thread(AddressOf ExecuteTask.StartSlide)
+                        t.IsBackground = True
                         t.Start()
                     ElseIf tmp.Count = 7 Then
                         If Not IsNumeric(tmp(5)) Then Throw New Exception("Delay value is not nummeric (0-x)!")
@@ -383,6 +382,7 @@ Module Main
                         Dim ExecuteTask As New AsyncSlideSettings(server, password, tmp(0), tmp(1), tmp(2), tmp(3), tmp(4), tmp(5), tmp(6))
                         Dim t As Threading.Thread
                         t = New Threading.Thread(AddressOf ExecuteTask.StartSlide)
+                        t.IsBackground = True
                         t.Start()
                     End If
                 End If
@@ -403,17 +403,20 @@ Module Main
                     End If
                 End If
                 If startstream = True Then
-                    _obs.SendRequest("StartStreaming")
-
+                    '_obs.SendRequest("StartStreaming")
+                    _obs.SendRequest("StartStream")
                 End If
                 If stopstream = True Then
-                    _obs.SendRequest("StopStreaming")
+                    '_obs.SendRequest("StopStreaming")
+                    _obs.SendRequest("StopStream")
                 End If
                 If startrecording = True Then
-                    _obs.SendRequest("StartRecording")
+                    '_obs.SendRequest("StartRecording")
+                    _obs.SendRequest("StartRecord")
                 End If
                 If stoprecording = True Then
-                    _obs.SendRequest("StopRecording")
+                    '_obs.SendRequest("StopRecording")
+                    _obs.SendRequest("StopRecord")
                 End If
 
                 If setdelay > 0 And argsindex < args.Count And argsindex > 1 Then
@@ -431,16 +434,16 @@ Module Main
 
         End Try
 
-        Console.SetOut(myout)
+        'Console.SetOut(myout)
         If errormessage = "" Then
-            Console.WriteLine("Ok")
+            Console.Write("Ok")
         Else
-            Console.WriteLine("Error: " & errormessage)
+            Console.Write("Error: " & errormessage)
         End If
 
     End Sub
 
-    Private Function IsNumericOrAsterix(ByVal value As String) As Boolean
+    Private Function IsNumericOrAsterix(value As String) As Boolean
         If value = "*" Then Return True
 
         If Not IsNumeric(value) Then Return False
@@ -448,7 +451,7 @@ Module Main
         Return True
     End Function
 
-    Private Function ConvertToType(ByVal text As String) As JToken
+    Private Function ConvertToType(text As String) As JToken
         If IsNumeric(text) Then
             If text.Contains(".") Then
                 Return Double.Parse(text, System.Globalization.CultureInfo.InvariantCulture)
@@ -465,37 +468,52 @@ Module Main
         End If
     End Function
 
-    Private Sub OBSToggleSource(ByVal source As String, Optional ByVal sceneName As String = "")
+    Private Function GetSceneItemId(sceneName As String, sourceName As String) As Integer
+        Dim fields As New JObject
+        fields.Add("sceneName", ConvertToType(sceneName))
+        fields.Add("sourceName", ConvertToType(sourceName))
+
+        Dim response As JObject = _obs.SendRequest("GetSceneItemId", fields)
+
+        Return response.GetValue("sceneItemId")
+    End Function
+
+    Private Function GetCurrentProgramScene() As String
+        Dim response As JObject = _obs.SendRequest("GetCurrentProgramScene")
+
+        Return response.GetValue("currentProgramSceneName")
+    End Function
+
+    Private Sub OBSToggleSource(source As String, Optional sceneName As String = "")
+
+        If sceneName = "" Then
+            sceneName = GetCurrentProgramScene()
+        End If
 
         Dim fields As New JObject
-        If sceneName <> "" Then fields.Add("scene-name", sceneName)
-        fields.Add("item", source)
-        Dim response As JObject = _obs.SendRequest("GetSceneItemProperties", fields)
-
-        fields = New JObject
-        If sceneName <> "" Then fields.Add("scene-name", sceneName)
-        fields.Add("item", source)
-        fields.Add("visible", Not Convert.ToBoolean(response.GetValue("visible")))
-        _obs.SendRequest("SetSceneItemProperties", fields)
+        fields.Add("sceneName", sceneName)
+        fields.Add("sceneItemId", GetSceneItemId(sceneName, source))
+        Dim sceneItemEnabled As JObject = _obs.SendRequest("GetSceneItemEnabled", fields)
+        fields.Add("sceneItemEnabled", Not Boolean.Parse(sceneItemEnabled.GetValue("sceneItemEnabled")))
+        _obs.SendRequest("SetSceneItemEnabled", fields)
 
     End Sub
 
-    Private Sub DoSlideSetting(ByVal source As String, ByVal filtername As String, ByVal settingname As String, ByVal fadestart As String, ByVal fadeend As String, Optional ByVal delay As Integer = 0, Optional ByVal fadestep As String = "1")
+    Private Sub DoSlideSetting(source As String, filtername As String, settingname As String, fadestart As String, fadeend As String, Optional delay As Integer = 0, Optional fadestep As String = "1")
 
         If delay < 5 Then delay = 5
         If delay > 1000 Then delay = 1000
-        Dim fields As New JObject
 
         If fadestart = "*" Or fadeend = "*" Then
             Dim tmpfield As JObject = New JObject
             tmpfield.Add("sourceName", source)
             tmpfield.Add("filterName", filtername)
-            Dim result As JObject = _obs.SendRequest("GetSourceFilterInfo", tmpfield)
+            Dim result As JObject = _obs.SendRequest("GetSourceFilter", tmpfield)
             If fadestart = "*" Then
-                Dim tmp As JObject = result.GetValue("settings")
+                Dim tmp As JObject = result.GetValue("filterSettings")
                 fadestart = tmp.GetValue(settingname)
             ElseIf fadeend = "*" Then
-                Dim tmp As JObject = result.GetValue("settings")
+                Dim tmp As JObject = result.GetValue("filterSettings")
                 fadeend = tmp.GetValue(settingname)
             End If
         End If
@@ -504,12 +522,13 @@ Module Main
 
         If fadestep < 1 Then
             haddecimals = True
-            fadestart = fadestart * 100
-            fadeend = fadeend * 100
-            fadestep = fadestep * 100
-            delay = delay / 100
+            fadestart *= 100
+            fadeend *= 100
+            fadestep *= 100
+            delay /= 100
         End If
 
+        Dim fields As JObject
         If fadestart < fadeend Then
             For a As Integer = fadestart To fadeend Step fadestep
                 fields = New JObject
@@ -543,40 +562,41 @@ Module Main
         End If
     End Sub
 
-    Private Sub OBSSetVolume(ByVal source As String, ByVal volume As Integer, Optional ByVal delay As Integer = 0, Optional ByVal steps As Integer = 1)
+    Private Sub OBSSetVolume(source As String, volume As Integer, Optional delay As Integer = 0, Optional steps As Integer = 1)
+        volume += 1
         If steps < 1 Then steps = 1
         If steps > 99 Then steps = 99
         If delay = 0 Then
             Dim molvol As Double = volume ^ 3 / 1000000 ' Convert percent to amplitude/mul (approximate, mul is non-linear)
             Dim fields As New JObject
-            fields.Add("source", source)
-            fields.Add("volume", molvol)
-            _obs.SendRequest("SetVolume", fields)
+            fields.Add("inputName", source)
+            fields.Add("inputVolumeMul", molvol)
+            _obs.SendRequest("SetInputVolume", fields)
         Else
             If delay < 5 Then delay = 5
             If delay > 1000 Then delay = 1000
             Dim fields As New JObject
-            fields.Add("source", source)
-            Dim _VolumeInfo As JObject = _obs.SendRequest("GetVolume", fields)
+            fields.Add("inputName", source)
+            Dim _VolumeInfo As JObject = _obs.SendRequest("GetInputVolume", fields)
 
-            Dim startvolume As Integer = Math.Pow(CDbl(_VolumeInfo.GetValue("volume")), 1.0 / 3) * 100 ' Convert amplitude/mul to percent (approximate, mul is non-linear)
+            Dim startvolume As Integer = Math.Pow(CDbl(_VolumeInfo.GetValue("inputVolumeMul")), 1.0 / 3) * 100 ' Convert amplitude/mul to percent (approximate, mul is non-linear)
 
             If startvolume = volume Then
                 Exit Sub
             ElseIf startvolume < volume Then
                 For a = startvolume To volume Step steps
                     fields = New JObject
-                    fields.Add("source", source)
-                    fields.Add("volume", CDbl(a ^ 3 / 1000000))
-                    _obs.SendRequest("SetVolume", fields)
+                    fields.Add("inputName", source)
+                    fields.Add("inputVolumeMul", CDbl(a ^ 3 / 1000000))
+                    _obs.SendRequest("SetInputVolume", fields)
                     Threading.Thread.Sleep(delay)
                 Next
             ElseIf startvolume > volume Then
                 For a = startvolume To volume Step -steps
                     fields = New JObject
-                    fields.Add("source", source)
-                    fields.Add("volume", CDbl(a ^ 3 / 1000000))
-                    _obs.SendRequest("SetVolume", fields)
+                    fields.Add("inputName", source)
+                    fields.Add("inputVolumeMul", CDbl(a ^ 3 / 1000000))
+                    _obs.SendRequest("SetInputVolume", fields)
                     Threading.Thread.Sleep(delay)
                 Next
             End If
@@ -586,13 +606,13 @@ Module Main
     Private Sub PrintUsage()
         Dim out As List(Of String) = New List(Of String)
 
-        out.Add("OBSCommand v1.5.7 Â©2018-2022 by FSC-SOFT (http://www.VoiceMacro.net)")
+        out.Add("OBSCommand v1.6 (for OBS Version 28.x.x and above / Websocket 5.x.x and above) ©2018-2022 by FSC-SOFT (http://www.VoiceMacro.net)")
         out.Add(vbCrLf)
         out.Add("Usage:")
         out.Add("------")
-        out.Add("OBSCommand.exe /server=127.0.0.1:4444 /password=xxxx /delay=0.5 /setdelay=0.05 /profile=myprofile /scene=myscene /hidesource=myscene/mysource /showsource=myscene/mysource /togglesource=myscene/mysource /toggleaudio=myaudio /mute=myaudio /unmute=myaudio /setvolume=mysource,volume,[delay],[steps] /fadeopacity=mysource,myfiltername,startopacity,endopacity,[fadedelay],[fadestep] /slidesetting=mysource,myfiltername,startvalue,endvalue,[slidedelay],[slidestep] /slideasync=mysource,myfiltername,startvalue,endvalue,[slidedelay],[slidestep] /startstream /stopstream /startrecording /stoprecording /command=mycommand,myparam1=myvalue1... /sendjson=jsonstring")
+        out.Add("OBSCommand /server=127.0.0.1:4455 /password=xxxx /delay=0.5 /setdelay=0.05 /profile=myprofile /scene=myscene /hidesource=myscene/mysource /showsource=myscene/mysource /togglesource=myscene/mysource /toggleaudio=myaudio /mute=myaudio /unmute=myaudio /setvolume=mysource,volume,[delay],[steps] /fadeopacity=mysource,myfiltername,startopacity,endopacity,[fadedelay],[fadestep] /slidesetting=mysource,myfiltername,startvalue,endvalue,[slidedelay],[slidestep] /slideasync=mysource,myfiltername,startvalue,endvalue,[slidedelay],[slidestep] /startstream /stopstream /startrecording /stoprecording /command=mycommand,myparam1=myvalue1... /sendjson=jsonstring")
         out.Add(vbCrLf)
-        out.Add("Note: If Server is omitted, default 127.0.0.1:4444 will be used.")
+        out.Add("Note: If Server is omitted, default 127.0.0.1:4455 will be used.")
         out.Add("Use quotes if your item name includes spaces.")
         out.Add("Password can be empty if no password is set in OBS Studio.")
         out.Add("You can use the same option multiple times.")
@@ -601,39 +621,46 @@ Module Main
         out.Add("This tool uses the obs-websocket plugin to talk to OBS Studio:")
         out.Add("https://github.com/Palakis/obs-websocket/releases")
         out.Add(vbCrLf)
-        out.Add("Dynamic link libraries used:")
-        out.Add("Json.NET Â©2008 by James Newton-King")
-        out.Add("websocket-sharp Â©2010-2016 by sta.blockhead")
-        out.Add("obs-websocket-dotnet Â©2017 by StÃ©phane Lepin.")
+        out.Add("3rd Party Dynamic link libraries used:")
+        out.Add("Json.NET ©2021 by James Newton-King")
+        out.Add("websocket-sharp ©2010-2022 by BarRaider")
+        out.Add("obs-websocket-dotnet ©2022 by Stéphane Lepin.")
         out.Add(vbCrLf)
         out.Add("Examples:")
         out.Add("---------")
-        out.Add("OBSCommand.exe /scene=myscene")
-        out.Add("OBSCommand.exe /toggleaudio=""Desktop Audio""")
-        out.Add("OBSCommand.exe /mute=myAudioSource")
-        out.Add("OBSCommand.exe /unmute=""my Audio Source""")
-        out.Add("OBSCommand.exe /setvolume=Mic/Aux,0,50,2")
-        out.Add("OBSCommand.exe /setvolume=Mic/Aux,100")
-        out.Add("OBSCommand.exe /fadeopacity=Mysource,myfiltername,0,100,5,2")
-        out.Add("OBSCommand.exe /slidesetting=Mysource,myfiltername,contrast,-2,0,100,0.01")
-        out.Add("OBSCommand.exe /slideasync=Mysource,myfiltername,saturation,*,5,100,0.1")
-        out.Add("OBSCommand.exe /stopstream")
-        out.Add("OBSCommand.exe /profile=myprofile /scene=myscene /showsource=mysource")
-        out.Add("OBSCommand.exe /showsource=mysource")
-        out.Add("OBSCommand.exe /hidesource=myscene/mysource")
-        out.Add("OBSCommand.exe /togglesource=myscene/mysource")
-        out.Add("OBSCommand.exe /showsource=""my scene""/""my source""")
-        out.Add("OBSCommand.exe /command=SaveReplayBuffer")
-        out.Add("OBSCommand.exe /command=TakeSourceScreenshot,sourceName=MyScene,PictureFormat=png,saveToFilePath=C:\OBSTest.png")
-        out.Add("OBSCommand.exe /command=SetSourceFilterSettings,sourceName=""Color Correction"",filterName=Opacity,filterSettings=opacity=10")
-        out.Add("OBSCommand.exe /sendjson=""ReorderSceneItems={'scene': 'MyScene', 'items': [{'name': 'Image'}, {'name': 'Gamecapture'}]}""")
-        out.Add("OBSCommand.exe /scene=mysource1 /delay=1.555 /scene=mysource2")
-        out.Add("OBSCommand.exe /setdelay=1.555 /scene=mysource1 /scene=mysource2")
+        out.Add("OBSCommand /scene=myscene")
+        out.Add("OBSCommand /toggleaudio=""Desktop Audio""")
+        out.Add("OBSCommand /mute=myAudioSource")
+        out.Add("OBSCommand /unmute=""my Audio Source""")
+        out.Add("OBSCommand /setvolume=Mic/Aux,0,50,2")
+        out.Add("OBSCommand /setvolume=Mic/Aux,100")
+        out.Add("OBSCommand /fadeopacity=Mysource,myfiltername,0,100,5,2")
+        out.Add("OBSCommand /slidesetting=Mysource,myfiltername,contrast,-2,0,100,0.01")
+        out.Add("OBSCommand /slideasync=Mysource,myfiltername,saturation,*,5,100,0.1")
+        out.Add("OBSCommand /stopstream")
+        out.Add("OBSCommand /profile=myprofile /scene=myscene /showsource=mysource")
+        out.Add("OBSCommand /showsource=mysource")
+        out.Add("OBSCommand /hidesource=myscene/mysource")
+        out.Add("OBSCommand /togglesource=myscene/mysource")
+        out.Add("OBSCommand /showsource=""my scene""/""my source""")
+        out.Add("")
+        out.Add("For most of other simpler requests, use the generalized '/command' feature (see syntax below):")
+        out.Add("OBSCommand /command=SaveReplayBuffer")
+        out.Add("OBSCommand /command=SaveSourceScreenshot,sourceName=MyScene,imageFormat=png,imageFilePath=C:\OBSTest.png")
+        out.Add("OBSCommand /command=SetSourceFilterSettings,sourceName=""Color Correction"",filterName=Opacity,filterSettings=opacity=10")
+        out.Add("OBSCommand /command=SetInputSettings,inputName=""Browser"",inputSettings=url='https://www.google.com/search?q=query+goes+there'")
+        out.Add("")
+        out.Add("For more complex requests, use the generalized '/sendjson' feature:")
+        out.Add("OBSCommand.exe /sendjson=SaveSourceScreenshot={'sourceName':'MyScource','imageFormat':'png','imageFilePath':'H:\\OBSScreenShot.png'}")
+        out.Add("")
+        out.Add("You can combine multiple commands like this:")
+        out.Add("OBSCommand /scene=mysource1 /delay=1.555 /scene=mysource2 ...etc")
+        out.Add("OBSCommand /setdelay=1.555 /scene=mysource1 /scene=mysource2 ...etc")
         out.Add(vbCrLf)
         out.Add("Options:")
         out.Add("--------")
-        out.Add("/server=127.0.0.1:4444            define server address and port")
-        out.Add("  Note: If Server is omitted, default 127.0.0.1:4444 will be used.")
+        out.Add("/server=127.0.0.1:4455            define server address and port")
+        out.Add("  Note: If Server is omitted, default 127.0.0.1:4455 will be used.")
         out.Add("/password=xxxx                    define password (can be omitted)")
         out.Add("/delay=n.nnn                      delay in seconds (0.001 = 1 ms)")
         out.Add("/setdelay=n.nnn                   global delay in seconds (0.001 = 1 ms)")
@@ -669,12 +696,13 @@ Module Main
         out.Add("/stoprecording                    stops recording")
         out.Add("")
         out.Add("General User Command syntax:")
+        out.Add("----------------------------")
         out.Add("/command=mycommand,myparam1=myvalue1,myparam2=myvalue2...")
         out.Add("                                  issues user command,parameter(s) (optional)")
         out.Add("/command=mycommand,myparam1=myvalue1,myparam2=myvalue2,myparam3=mysubparam=mysubparamvalue")
         out.Add("                                  issues user command,parameters and sub-parameters")
         out.Add("")
-        out.Add("A full list of commands is available here https://github.com/Palakis/obs-websocket/blob/4.x-current/docs/generated/protocol.md")
+        out.Add("A full list of commands is available here https://github.com/obsproject/obs-websocket/blob/master/docs/generated/protocol.md")
         out.Add("")
 
         Dim i As Integer = 0
@@ -692,12 +720,12 @@ Module Main
             z += 1
             If i >= out.Count Then Exit Do
 
-            z = z + out(i).Length / (Console.WindowWidth / 2)
+            z += out(i).Length / (Console.WindowWidth / 2)
         Loop
 
     End Sub
 
-    Private Function SplitWhilePreservingQuotedValues(value As String, delimiter As Char, Optional ByVal DeleteQuotes As Boolean = False) As String()
+    Private Function SplitWhilePreservingQuotedValues(value As String, delimiter As Char, Optional DeleteQuotes As Boolean = False) As String()
         Dim csvPreservingQuotedStrings As New Regex(String.Format("(""[^""]*""|[^{0}])+", delimiter))
         Dim values = csvPreservingQuotedStrings.Matches(value).Cast(Of Match)().[Select](Function(m) m.Value.TrimStart(" ")).Where(Function(v) Not String.IsNullOrEmpty(v))
 
@@ -721,6 +749,11 @@ Module Main
         Console.SetCursorPosition(0, currentLineCursor)
     End Sub
 
+
+
+
+
+    ' Class for Async Slide Settings
     Class AsyncSlideSettings
         Dim _server As String
         Dim _password As String
@@ -732,7 +765,7 @@ Module Main
         Dim _delay As Integer
         Dim _fadestep As String
 
-        Public Sub New(ByVal server As String, ByVal password As String, ByVal source As String, ByVal filtername As String, ByVal settingname As String, ByVal fadestart As String, ByVal fadeend As String, Optional ByVal delay As Integer = 0, Optional ByVal fadestep As String = "1")
+        Public Sub New(server As String, password As String, source As String, filtername As String, settingname As String, fadestart As String, fadeend As String, Optional delay As Integer = 0, Optional fadestep As String = "1")
             _server = server
             _password = password
             _source = source
@@ -748,25 +781,34 @@ Module Main
             SlideSetting(_server, _password, _source, _filtername, _settingname, _fadestart, _fadeend, _delay, _fadestep)
         End Sub
 
-        Public Sub SlideSetting(ByVal server As String, ByVal password As String, ByVal source As String, ByVal filtername As String, ByVal settingname As String, ByVal fadestart As String, ByVal fadeend As String, Optional ByVal delay As Integer = 0, Optional ByVal fadestep As String = "1")
+        Public Sub SlideSetting(server As String, password As String, source As String, filtername As String, settingname As String, fadestart As String, fadeend As String, Optional delay As Integer = 0, Optional fadestep As String = "1")
             Dim obs = New OBSWebsocket()
             obs.WSTimeout = New TimeSpan(0, 0, 0, 3)
-            obs.Connect(server, password)
+            obs.ConnectAsync(server, password)
+            Dim i As Integer = 0
+            Do While Not obs.IsConnected
+                Threading.Thread.Sleep(10)
+                i += 1
+                If i > 300 Then
+                    Console.Write("Error: can't connect to OBS websocket plugin!")
+                    End
+                End If
+            Loop
 
             If delay < 5 Then delay = 5
             If delay > 1000 Then delay = 1000
-            Dim fields As New JObject
 
             If fadestart = "*" Or fadeend = "*" Then
                 Dim tmpfield As JObject = New JObject
                 tmpfield.Add("sourceName", source)
                 tmpfield.Add("filterName", filtername)
-                Dim result As JObject = obs.SendRequest("GetSourceFilterInfo", tmpfield)
+                Dim result As JObject = obs.SendRequest("GetSourceFilter", tmpfield)
+
                 If fadestart = "*" Then
-                    Dim tmp As JObject = result.GetValue("settings")
+                    Dim tmp As JObject = result.GetValue("filterSettings")
                     fadestart = tmp.GetValue(settingname)
                 ElseIf fadeend = "*" Then
-                    Dim tmp As JObject = result.GetValue("settings")
+                    Dim tmp As JObject = result.GetValue("filterSettings")
                     fadeend = tmp.GetValue(settingname)
                 End If
             End If
@@ -775,12 +817,13 @@ Module Main
 
             If fadestep < 1 Then
                 haddecimals = True
-                fadestart = fadestart * 100
-                fadeend = fadeend * 100
-                fadestep = fadestep * 100
-                delay = delay / 100
+                fadestart *= 100
+                fadeend *= 100
+                fadestep *= 100
+                delay /= 100
             End If
 
+            Dim fields As JObject
             If fadestart < fadeend Then
                 For a As Integer = fadestart To fadeend Step fadestep
                     fields = New JObject
@@ -814,6 +857,7 @@ Module Main
             End If
 
             _obs.Disconnect()
+
         End Sub
     End Class
 End Module

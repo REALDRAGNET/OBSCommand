@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "OBSCommand": {
+      "commandName": "Project",
+      "commandLineArgs": "/sendjson=SaveSourceScreenshot={'sourceName':'Screen','imageFormat':'png','imageFilePath':'H:\\\\OBSScreenShot.png'}"
+    }
+  }
+}
