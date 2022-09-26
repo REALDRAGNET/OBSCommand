@@ -284,7 +284,7 @@ Module Main
                         Dim CurrentScene = GetCurrentProgramScene()
                         Dim fields As New JObject
                         fields.Add("sceneName", CurrentScene)
-                        fields.Add("sceneItemId", GetSceneItemId(CurrentScene, hidesource))
+                        fields.Add("sceneItemId", GetSceneItemId(CurrentScene, showsource))
                         fields.Add("sceneItemEnabled", True)
                         _obs.SendRequest("SetSceneItemEnabled", fields)
                     End If
@@ -606,7 +606,7 @@ Module Main
     Private Sub PrintUsage()
         Dim out As List(Of String) = New List(Of String)
 
-        out.Add("OBSCommand v1.6 (for OBS Version 28.x.x and above / Websocket 5.x.x and above) ©2018-2022 by FSC-SOFT (http://www.VoiceMacro.net)")
+        out.Add("OBSCommand v1.6.1 (for OBS Version 28.x.x and above / Websocket 5.x.x and above) ©2018-2022 by FSC-SOFT (http://www.VoiceMacro.net)")
         out.Add(vbCrLf)
         out.Add("Usage:")
         out.Add("------")
