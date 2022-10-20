@@ -175,7 +175,7 @@ Module Main
 
                     _obs.WSTimeout = New TimeSpan(0, 0, 0, 3)
                     _obs.ConnectAsync(server, Nothing)
-                    Dim i As Integer = 0
+                    'Dim i As Integer = 0
                     'Do While Not _obs.IsConnected
                     '    Threading.Thread.Sleep(10)
                     '    i += 1
@@ -634,7 +634,7 @@ Module Main
     Private Sub PrintUsage()
         Dim out As List(Of String) = New List(Of String)
 
-        out.Add("OBSCommand v1.6.1 (for OBS Version 28.x.x and above / Websocket 5.x.x and above) ©2018-2022 by FSC-SOFT (http://www.VoiceMacro.net)")
+        out.Add("OBSCommand v1.6.2 (for OBS Version 28.x.x and above / Websocket 5.x.x and above) ©2018-2022 by FSC-SOFT (http://www.VoiceMacro.net)")
         out.Add(vbCrLf)
         out.Add("Usage:")
         out.Add("------")
