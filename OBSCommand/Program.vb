@@ -1,9 +1,13 @@
 Imports OBSWebsocketDotNet
 Imports Newtonsoft.Json.Linq
 Imports System.Text.RegularExpressions
+Imports System.Threading
+
 Module Main
 
-    Private _obs As OBSWebsocket
+    Private _obs As OBSWebsocket = New OBSWebsocket()
+    Private isConnected As Boolean = False
+
     Sub Main()
 
         Dim args As String() = Environment.GetCommandLineArgs
@@ -40,6 +44,9 @@ Module Main
         Dim isInitialized As Boolean = False
         Dim skipfirst As Boolean = False
         Dim argsindex As Integer
+
+        AddHandler _obs.Connected, AddressOf Connect
+        AddHandler _obs.Disconnected, AddressOf Disconnect
 
         For Each arg As String In args
             argsindex += 1
@@ -164,19 +171,29 @@ Module Main
 
                 If isInitialized = False Then
                     isInitialized = True
-                    _obs = New OBSWebsocket()
+                    '_obs = New OBSWebsocket()
+
                     _obs.WSTimeout = New TimeSpan(0, 0, 0, 3)
-                    _obs.ConnectAsync(server, password)
+                    _obs.ConnectAsync(server, Nothing)
                     Dim i As Integer = 0
-                    Do While Not _obs.IsConnected
-                        Threading.Thread.Sleep(10)
-                        i += 1
-                        If i > 300 Then
-                            Console.Write("Error: can't connect to OBS websocket plugin!")
-                            End
-                        End If
+                    'Do While Not _obs.IsConnected
+                    '    Threading.Thread.Sleep(10)
+                    '    i += 1
+                    '    If i > 300 Then
+                    '        Console.Write("Error: can't connect to OBS websocket plugin!")
+                    '        End
+                    '    End If
+                    'Loop
+                    Do While Not isConnected
+                        Dim waitThread As New Thread(
+                            Sub()
+                                Thread.Sleep(10)
+                            End Sub)
+
+                        waitThread.Start()
+                        waitThread.Join()
                     Loop
-                    'Dim versionInfo As ObsVersion = _obs.GetVersion()
+                    'Dim versionInfo As Types.ObsVersion = _obs.GetVersion()
                 End If
 
                 If profile <> "" Then
@@ -441,6 +458,17 @@ Module Main
             Console.Write("Error: " & errormessage)
         End If
 
+    End Sub
+
+    Private Sub Connect(sender As Object, e As EventArgs)
+        Debug.WriteLine("Connection established!")
+        isConnected = True
+        'Console.WriteLine("Connected")
+    End Sub
+
+    Private Sub Disconnect(sender As Object, e As Communication.ObsDisconnectionInfo)
+        Debug.WriteLine("Connection terminated!")
+        'Console.WriteLine("DisConnected")
     End Sub
 
     Private Function IsNumericOrAsterix(value As String) As Boolean

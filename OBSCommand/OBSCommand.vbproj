@@ -18,7 +18,7 @@ rem dotnet publish OBSCommand.vbproj -c release -r osx.10.11-x64</PostBuildEvent
     <Company>FSC-SOFT</Company>
     <Authors />
     <Copyright>Copyright © FSC-SOFT 2018-2022</Copyright>
-    <Version>1.6.1</Version>
+    <Version>1.6.2</Version>
     <PackageProjectUrl>https://github.com/REALDRAGNET/OBSCommand</PackageProjectUrl>
     <RepositoryUrl>https://github.com/REALDRAGNET/OBSCommand</RepositoryUrl>
     <PackageReleaseNotes>for OBS Studio 28.x.x and above</PackageReleaseNotes>

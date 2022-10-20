@@ -2,7 +2,7 @@
   "profiles": {
     "OBSCommand": {
       "commandName": "Project",
-      "commandLineArgs": "/showsource=Image"
+      "commandLineArgs": "/server=192.168.0.5:4455 /scene=Test"
     }
   }
 }
