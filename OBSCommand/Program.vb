@@ -7,6 +7,7 @@ Module Main
 
     Private _obs As OBSWebsocket = New OBSWebsocket()
     Private isConnected As Boolean = False
+    Private disconnectInfo As String = ""
 
     Sub Main()
 
@@ -171,27 +172,25 @@ Module Main
 
                 If isInitialized = False Then
                     isInitialized = True
-                    '_obs = New OBSWebsocket()
-
                     _obs.WSTimeout = New TimeSpan(0, 0, 0, 3)
-                    _obs.ConnectAsync(server, Nothing)
-                    'Dim i As Integer = 0
-                    'Do While Not _obs.IsConnected
-                    '    Threading.Thread.Sleep(10)
-                    '    i += 1
-                    '    If i > 300 Then
-                    '        Console.Write("Error: can't connect to OBS websocket plugin!")
-                    '        End
-                    '    End If
-                    'Loop
+                    _obs.ConnectAsync(server, password)
+                    Dim i As Integer = 0
                     Do While Not isConnected
                         Dim waitThread As New Thread(
                             Sub()
                                 Thread.Sleep(10)
                             End Sub)
-
                         waitThread.Start()
                         waitThread.Join()
+                        i += 1
+                        If i > 300 Then
+                            Console.Write("Error: can't connect to OBS websocket plugin!")
+                            End
+                        End If
+                        If disconnectInfo <> "" Then
+                            Console.Write("Error: " & disconnectInfo)
+                            End
+                        End If
                     Loop
                     'Dim versionInfo As Types.ObsVersion = _obs.GetVersion()
                 End If
@@ -467,7 +466,8 @@ Module Main
     End Sub
 
     Private Sub Disconnect(sender As Object, e As Communication.ObsDisconnectionInfo)
-        Debug.WriteLine("Connection terminated!")
+        Debug.WriteLine("Connection terminated: " & e.DisconnectReason)
+        disconnectInfo = e.DisconnectReason
         'Console.WriteLine("DisConnected")
     End Sub
 
@@ -634,7 +634,7 @@ Module Main
     Private Sub PrintUsage()
         Dim out As List(Of String) = New List(Of String)
 
-        out.Add("OBSCommand v1.6.2 (for OBS Version 28.x.x and above / Websocket 5.x.x and above) ©2018-2022 by FSC-SOFT (http://www.VoiceMacro.net)")
+        out.Add("OBSCommand v1.6.3 (for OBS Version 28.x.x and above / Websocket 5.x.x and above) ©2018-2022 by FSC-SOFT (http://www.VoiceMacro.net)")
         out.Add(vbCrLf)
         out.Add("Usage:")
         out.Add("------")
